@@ -13,7 +13,7 @@
       <div>
         <p class="eyebrow">Ocean Sudoku</p>
         <h1>海洋風數獨</h1>
-        <p class="subtitle">自動產生唯一解題目，支援分享同一題網址、手機、鍵盤、筆記、提示與難度選擇。</p>
+        <p class="subtitle">自動產生唯一解題目，支援分享同一題網址、多人即時房間、手機、鍵盤、筆記、提示與難度選擇。</p>
       </div>
       <div class="controls" aria-label="遊戲控制">
         <label class="select-wrap">
@@ -44,6 +44,35 @@
       </section>
 
       <aside class="side-panel card" aria-label="操作面板">
+        <section class="room-panel" aria-label="多人房間">
+          <div class="room-heading">
+            <div>
+              <p class="mini-eyebrow">Multiplayer</p>
+              <h2>多人房間</h2>
+            </div>
+            <span id="roomBadge" class="room-badge">單人</span>
+          </div>
+
+          <label class="field">
+            <span>你的暱稱</span>
+            <input id="playerName" type="text" maxlength="18" autocomplete="nickname" placeholder="海友" />
+          </label>
+
+          <div class="room-actions">
+            <button id="createRoomBtn" class="tool" type="button">建立房間</button>
+            <button id="copyRoomLinkBtn" class="tool" type="button" disabled>複製房間連結</button>
+          </div>
+
+          <div class="join-row">
+            <input id="roomCodeInput" type="text" maxlength="16" inputmode="text" autocomplete="off" placeholder="OCEAN-1234" aria-label="房間代碼" />
+            <button id="joinRoomBtn" class="tool" type="button">加入</button>
+          </div>
+
+          <button id="leaveRoomBtn" class="tool leave" type="button" disabled>離開房間</button>
+          <p id="roomStatus" class="room-status">多人功能需要先設定 Firebase，單人模式仍可遊玩。</p>
+          <div id="playerList" class="player-list" aria-live="polite"></div>
+        </section>
+
         <div class="tool-grid">
           <button id="noteBtn" class="tool" aria-pressed="false">筆記模式</button>
           <button id="eraseBtn" class="tool">清除</button>
@@ -56,7 +85,8 @@
         <details class="help">
           <summary>玩法說明</summary>
           <p>每一列、每一行、每個 3×3 宮格都必須填入 1～9，且不能重複。</p>
-          <p>快捷鍵：1～9 輸入，Backspace 清除，N 切換筆記，H 使用提示。按「分享同一題」可複製含題目種子的網址，朋友打開後會看到同一題。</p>
+          <p>快捷鍵：1～9 輸入，Backspace 清除，N 切換筆記，H 使用提示。按「分享同一題」可複製含題目種子的網址。</p>
+          <p>多人房間：建立房間後把房間連結傳給朋友，大家會同步同一盤的填數字進度；筆記與選取格目前是個人本機狀態。</p>
         </details>
       </aside>
     </main>
@@ -78,6 +108,9 @@
     </form>
   </dialog>
 
+  <script src="https://www.gstatic.com/firebasejs/10.12.5/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.12.5/firebase-database-compat.js"></script>
+  <script src="firebase-config.js"></script>
   <script src="app.js"></script>
 </body>
 </html>

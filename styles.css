@@ -389,3 +389,128 @@ select {
 .overlay[hidden] {
   display: none !important;
 }
+
+.room-panel {
+  display: grid;
+  gap: 12px;
+  margin-bottom: 18px;
+  padding-bottom: 18px;
+  border-bottom: 1px solid var(--line);
+}
+
+.room-heading {
+  display: flex;
+  justify-content: space-between;
+  align-items: start;
+  gap: 12px;
+}
+
+.room-heading h2 {
+  margin: 0;
+  color: var(--ocean-deep);
+  font-size: 1.25rem;
+}
+
+.mini-eyebrow {
+  margin: 0 0 3px;
+  color: var(--ocean);
+  font-size: .72rem;
+  font-weight: 900;
+  letter-spacing: .1em;
+  text-transform: uppercase;
+}
+
+.room-badge {
+  max-width: 150px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  border-radius: 999px;
+  padding: 7px 10px;
+  background: rgba(255,255,255,.72);
+  border: 1px solid var(--line);
+  color: var(--muted);
+  font-size: .78rem;
+  font-weight: 900;
+}
+
+.room-badge.online {
+  color: var(--ocean-deep);
+  background: linear-gradient(135deg, #d9f7fb, white);
+}
+
+.field {
+  display: grid;
+  gap: 6px;
+  color: var(--muted);
+  font-weight: 800;
+}
+
+input {
+  width: 100%;
+  min-height: 46px;
+  padding: 0 14px;
+  border-radius: 16px;
+  border: 1px solid var(--line);
+  background: rgba(255,255,255,.86);
+  color: var(--ink);
+  font: inherit;
+  outline: none;
+}
+
+input:focus {
+  box-shadow: 0 0 0 3px rgba(15,127,154,.18);
+  border-color: rgba(15,127,154,.45);
+}
+
+.room-actions, .join-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+}
+
+.join-row {
+  grid-template-columns: minmax(0, 1fr) auto;
+}
+
+.leave {
+  color: #8d2531;
+  background: rgba(255, 240, 243, .82);
+}
+
+.room-status {
+  margin: 0;
+  color: var(--muted);
+  line-height: 1.55;
+  font-size: .92rem;
+}
+
+.player-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 7px;
+  min-height: 0;
+}
+
+.player-chip {
+  display: inline-flex;
+  align-items: center;
+  max-width: 100%;
+  min-height: 30px;
+  border-radius: 999px;
+  padding: 5px 10px;
+  background: rgba(255,255,255,.7);
+  border: 1px solid var(--line);
+  color: var(--ocean-deep);
+  font-size: .86rem;
+  font-weight: 900;
+}
+
+.player-chip.me {
+  background: var(--same);
+}
+
+@media (max-width: 540px) {
+  .room-actions { grid-template-columns: 1fr; }
+  .join-row { grid-template-columns: 1fr; }
+}

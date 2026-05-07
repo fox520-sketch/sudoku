@@ -1,6 +1,11 @@
 # 海洋風數獨 Ocean Sudoku
 
-這是一個純前端、可離線執行的數獨網頁遊戲專案，使用 HTML、CSS、JavaScript 製作，不需要安裝任何套件。
+這是一個海洋風、手機可用的數獨網頁遊戲專案，使用 HTML、CSS、JavaScript 製作。
+
+本版加入兩種分享玩法：
+
+1. **分享同一題網址**：朋友打開後看到同一題，但進度各自獨立。
+2. **多人即時房間**：需要設定 Firebase Realtime Database。建立房間後，朋友打開房間連結可以同步同一盤的填數字進度。
 
 ## 功能
 
@@ -8,7 +13,8 @@
 - 挖空後檢查題目是否只有唯一解
 - 四種難度：簡單、中等、困難、專家
 - 手機版響應式介面
-- 分享同一題網址：網址會帶有 seed 與 difficulty，朋友打開後會看到同一題
+- 分享同一題網址：網址會帶有 seed 與 difficulty
+- 多人即時房間：房間代碼、房間連結、玩家列表、同步填數字進度
 - 海洋風簡約清爽 UI
 - 筆記模式 / 候選數
 - 提示功能
@@ -16,9 +22,20 @@
 - 錯誤、提示、時間統計
 - 支援鍵盤操作
 
-## 使用方式
+## 檔案結構
 
-直接用瀏覽器打開 `index.html` 即可。
+```text
+index.html                主頁面
+styles.css                介面樣式
+app.js                    遊戲邏輯、數獨產生器、多人同步
+firebase-config.js        Firebase 設定檔，需要貼上你的專案設定
+firebase-rules-demo.json  Firebase Realtime Database 測試規則
+README.md                 專案說明
+```
+
+## 單人使用方式
+
+直接用瀏覽器打開 `index.html`，或部署到 GitHub Pages。
 
 按下「分享同一題」後，遊戲會複製目前題目的連結，例如：
 
@@ -26,18 +43,24 @@
 index.html?seed=abc123&difficulty=medium
 ```
 
-朋友打開這個連結會得到相同題目；目前版本是「同題各自玩」，不會同步彼此進度。
+朋友打開這個連結會得到相同題目；這是「同題各自玩」，不會同步彼此進度。
 
-注意：若你只是用本機 `file://` 開啟，複製出的連結通常只有自己的電腦能用。要讓朋友直接打開網址，請先部署到 GitHub Pages、Netlify、Vercel 或其他靜態網站空間。
+## 多人房間使用方式
 
-## 檔案結構
+多人房間需要先完成 Firebase 設定：
 
-```text
-index.html   主頁面
-styles.css   介面樣式
-app.js       遊戲邏輯與數獨產生器
-README.md    專案說明
-```
+1. 到 Firebase Console 建立專案。
+2. 新增 Web App。
+3. 建立 Realtime Database。
+4. 到 Realtime Database 的 Rules 貼上 `firebase-rules-demo.json` 的內容。
+5. 複製 Firebase SDK config。
+6. 打開 `firebase-config.js`，把 placeholder 換成你的實際設定。
+7. 上傳更新後的檔案到 GitHub repository。
+8. 等 GitHub Pages 重新部署。
+9. 打開網站，按「建立房間」。
+10. 按「複製房間連結」給朋友。
+
+注意：`firebase-rules-demo.json` 是方便測試的公開房間規則，適合原型測試，不適合有帳號、排行榜、個資或正式商用資料的版本。
 
 ## 快捷鍵
 

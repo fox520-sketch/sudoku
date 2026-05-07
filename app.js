@@ -67,7 +67,8 @@ const state = {
     heartbeatId: null,
     applyingRemote: false,
     loaded: false,
-    completedShown: false
+    completedShown: false,
+    solvedBy: {}
   }
 };
 
@@ -385,6 +386,7 @@ function handleNumber(value) {
   }
 
   const wasEmpty = state.current[index] === 0;
+  const wasCorrectBefore = state.current[index] === state.solution[index];
   state.current[index] = value;
   state.notes[index].clear();
   clearPeerNotes(index, value);
@@ -401,7 +403,7 @@ function handleNumber(value) {
 
   renderBoard();
   maybeFinish();
-  syncRoomState({ action: 'input', index, value });
+  syncRoomState({ action: 'input', index, value, wasCorrectBefore });
 }
 
 function eraseSelected() {
@@ -411,11 +413,12 @@ function eraseSelected() {
     setMessage('題目原本給的數字不能清除。');
     return;
   }
+  const wasCorrectBefore = state.current[index] === state.solution[index];
   state.current[index] = 0;
   state.notes[index].clear();
   setMessage('已清除。');
   renderBoard();
-  syncRoomState({ action: 'erase', index, value: 0 });
+  syncRoomState({ action: 'erase', index, value: 0, wasCorrectBefore });
 }
 
 function giveHint() {
@@ -483,6 +486,7 @@ function resetState(puzzleData, seed) {
   state.notesMode = false;
   state.seed = seed;
   state.locked = false;
+  state.room.solvedBy = {};
 }
 
 function setControlsDisabled(disabled) {
@@ -664,6 +668,54 @@ function stringToBoard(value) {
   return [...text].map((char) => Number(char));
 }
 
+function normalizeSolvedBy(value) {
+  if (!value || typeof value !== 'object') return {};
+  const solvedBy = {};
+  for (const [rawIndex, rawPlayerId] of Object.entries(value)) {
+    const index = Number(rawIndex);
+    const playerId = String(rawPlayerId || '').trim();
+    if (Number.isInteger(index) && index >= 0 && index < CELLS && playerId) {
+      solvedBy[index] = playerId;
+    }
+  }
+  return solvedBy;
+}
+
+function countSolvedBy(solvedBy, playerId) {
+  const id = String(playerId || '');
+  if (!id) return 0;
+  return Object.values(normalizeSolvedBy(solvedBy)).filter((value) => value === id).length;
+}
+
+function getServerIncrement(delta) {
+  const increment = window.firebase?.database?.ServerValue?.increment;
+  return typeof increment === 'function' ? increment(delta) : delta;
+}
+
+function getContributionUpdates(move = {}) {
+  if (!isInRoom() || !Number.isInteger(move.index) || move.index < 0 || move.index >= CELLS) return {};
+  if (state.fixed[move.index]) return {};
+
+  const updates = {};
+  const indexKey = String(move.index);
+  const existingSolver = state.room.solvedBy?.[indexKey] || state.room.solvedBy?.[move.index] || '';
+  const isCorrectNow = state.current[move.index] === state.solution[move.index];
+  const shouldCountAsSolved = move.action === 'input' && isCorrectNow;
+
+  if (shouldCountAsSolved && !existingSolver) {
+    updates[`solvedBy/${indexKey}`] = state.room.playerId;
+    updates[`players/${state.room.playerId}/solvedCount`] = getServerIncrement(1);
+  } else if (!isCorrectNow && existingSolver) {
+    updates[`solvedBy/${indexKey}`] = null;
+    updates[`players/${existingSolver}/solvedCount`] = getServerIncrement(-1);
+  } else if (move.action === 'erase' && existingSolver && move.wasCorrectBefore) {
+    updates[`solvedBy/${indexKey}`] = null;
+    updates[`players/${existingSolver}/solvedCount`] = getServerIncrement(-1);
+  }
+
+  return updates;
+}
+
 function createRoomCode() {
   let suffix = '';
   for (let i = 0; i < 4; i++) suffix += ROOM_CHARS[Math.floor(Math.random() * ROOM_CHARS.length)];
@@ -796,22 +848,36 @@ function updateRoomControls() {
   }
 }
 
-function renderPlayers(players = null) {
+function renderPlayers(players = null, solvedBy = state.room.solvedBy) {
   if (!players) {
     playerListEl.innerHTML = '';
     return;
   }
 
+  const solvedMap = normalizeSolvedBy(solvedBy);
   const entries = Object.entries(players)
-    .map(([id, player]) => ({ id, name: player?.name || '海友' }))
-    .sort((a, b) => a.name.localeCompare(b.name, 'zh-Hant'));
+    .map(([id, player]) => {
+      const fallbackCount = countSolvedBy(solvedMap, id);
+      const savedCount = Number(player?.solvedCount);
+      return {
+        id,
+        name: player?.name || '海友',
+        solvedCount: Number.isFinite(savedCount) ? Math.max(0, savedCount) : fallbackCount,
+        online: player?.online !== false
+      };
+    })
+    .sort((a, b) => Number(b.online) - Number(a.online) || b.solvedCount - a.solvedCount || a.name.localeCompare(b.name, 'zh-Hant'));
 
   playerListEl.innerHTML = '';
   for (const player of entries) {
     const chip = document.createElement('span');
     chip.className = 'player-chip';
     if (player.id === state.room.playerId) chip.classList.add('me');
-    chip.textContent = player.id === state.room.playerId ? `${player.name}（你）` : player.name;
+    if (!player.online) chip.classList.add('offline');
+    const selfLabel = player.id === state.room.playerId ? '（你）' : '';
+    const offlineLabel = player.online ? '' : '（離線）';
+    const label = `${player.name}${selfLabel}${offlineLabel}`;
+    chip.textContent = `${label}｜${player.solvedCount} 格`;
     playerListEl.appendChild(chip);
   }
 }
@@ -826,6 +892,7 @@ function roomPayloadFromCurrentGame() {
     mistakes: state.mistakes,
     hints: state.hints,
     locked: false,
+    solvedBy: {},
     createdAt: getFirebaseServerTimestamp(),
     updatedAt: getFirebaseServerTimestamp(),
     lastMove: {
@@ -895,6 +962,7 @@ function applyRoomSnapshot(data, initial = false) {
   state.mistakes = Number(data.mistakes || 0);
   state.hints = Number(data.hints || 0);
   state.locked = data.locked === true || state.current.every((value, index) => value === state.solution[index]);
+  state.room.solvedBy = normalizeSolvedBy(data.solvedBy);
 
   if (initial) {
     state.notes = Array.from({ length: CELLS }, () => new Set());
@@ -927,6 +995,7 @@ async function enterRoom(rawCode, options = {}) {
   }
 
   const roomRef = state.room.db.ref(`rooms/${code}`);
+  let roomData = null;
 
   try {
     const snapshot = await roomRef.once('value');
@@ -934,6 +1003,7 @@ async function enterRoom(rawCode, options = {}) {
       setMessage(`找不到房間 ${code}，請確認房間代碼是否正確。`);
       return;
     }
+    roomData = snapshot.val() || {};
   } catch (error) {
     console.error(error);
     setMessage('讀取房間失敗，請確認 Firebase Realtime Database 是否已啟用。');
@@ -952,10 +1022,15 @@ async function enterRoom(rawCode, options = {}) {
   try {
     await state.room.playerRef.set({
       name: state.room.playerName,
+      solvedCount: countSolvedBy(roomData?.solvedBy, state.room.playerId),
+      online: true,
       joinedAt: getFirebaseServerTimestamp(),
       lastSeen: getFirebaseServerTimestamp()
     });
-    state.room.playerRef.onDisconnect().remove();
+    state.room.playerRef.onDisconnect().update({
+      online: false,
+      lastSeen: getFirebaseServerTimestamp()
+    });
     state.room.heartbeatId = setInterval(() => {
       if (state.room.playerRef) {
         state.room.playerRef.update({ lastSeen: getFirebaseServerTimestamp() }).catch(() => {});
@@ -980,8 +1055,8 @@ async function enterRoom(rawCode, options = {}) {
     const initial = !state.room.loaded;
     if (applyRoomSnapshot(data, initial)) {
       state.room.loaded = true;
-      renderPlayers(data.players || {});
-      setRoomStatus(`房間 ${state.room.code}｜多人同步中。`);
+      renderPlayers(data.players || {}, data.solvedBy || {});
+      setRoomStatus(`房間 ${state.room.code}｜多人同步中｜每位海友分開統計正確填入格數。`);
     }
     state.room.applyingRemote = false;
     updateRoomControls();
@@ -1005,7 +1080,10 @@ async function leaveRoom(options = {}) {
 
   if (state.room.playerRef) {
     try {
-      await state.room.playerRef.remove();
+      await state.room.playerRef.update({
+        online: false,
+        lastSeen: getFirebaseServerTimestamp()
+      });
     } catch (error) {
       // 離開房間的清除失敗不影響本機遊戲。
     }
@@ -1019,6 +1097,7 @@ async function leaveRoom(options = {}) {
   state.room.applyingRemote = false;
   state.room.loaded = false;
   state.room.completedShown = false;
+  state.room.solvedBy = {};
   renderPlayers();
   updateRoomControls();
 
@@ -1030,7 +1109,7 @@ async function leaveRoom(options = {}) {
 function syncRoomState(move = {}) {
   if (!isInRoom() || state.room.applyingRemote || !state.room.ref) return;
 
-  state.room.ref.update({
+  const updates = {
     current: boardToString(state.current),
     mistakes: state.mistakes,
     hints: state.hints,
@@ -1043,8 +1122,11 @@ function syncRoomState(move = {}) {
       index: Number.isInteger(move.index) ? move.index : -1,
       value: Number.isInteger(move.value) ? move.value : 0,
       at: getFirebaseServerTimestamp()
-    }
-  }).catch((error) => {
+    },
+    ...getContributionUpdates(move)
+  };
+
+  state.room.ref.update(updates).catch((error) => {
     console.error(error);
     setMessage('同步房間失敗，請檢查網路或 Firebase 規則。');
   });
@@ -1092,7 +1174,12 @@ function bindEvents() {
   });
 
   window.addEventListener('beforeunload', () => {
-    if (state.room.playerRef) state.room.playerRef.remove();
+    if (state.room.playerRef) {
+      state.room.playerRef.update({
+        online: false,
+        lastSeen: getFirebaseServerTimestamp()
+      });
+    }
   });
 }
 

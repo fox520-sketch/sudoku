@@ -514,3 +514,42 @@ input:focus {
   .room-actions { grid-template-columns: 1fr; }
   .join-row { grid-template-columns: 1fr; }
 }
+
+/* 手機版操作順序：先放常用解題工具，再放多人房間管理，單手操作更順。 */
+@media (max-width: 540px) {
+  .side-panel {
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+  }
+
+  .tool-grid {
+    order: 1;
+    margin-bottom: 0;
+  }
+
+  .number-pad {
+    order: 2;
+  }
+
+  .help {
+    order: 3;
+    margin-top: 0;
+  }
+
+  .room-panel {
+    order: 4;
+    margin: 2px 0 0;
+    padding: 18px 0 0;
+    border-top: 1px solid var(--line);
+    border-bottom: 0;
+  }
+
+  .player-chip {
+    font-size: .82rem;
+  }
+}
+
+.player-chip.offline {
+  opacity: .62;
+}

@@ -230,10 +230,9 @@ const state = {
     startedAtCurrent: [],
     panelDrag: {
       active: false,
-      startX: 0,
-      startY: 0,
-      originX: 0,
-      originY: 0
+      pointerId: null,
+      offsetX: 0,
+      offsetY: 0
     }
   },
   room: {
@@ -677,7 +676,11 @@ function resetTeacherPanelPosition() {
   if (!teacherPanelEl) return;
   const drag = state.tutor.panelDrag;
   drag.active = false;
+  drag.pointerId = null;
+  drag.offsetX = 0;
+  drag.offsetY = 0;
   teacherPanelEl.classList.remove('dragging', 'user-positioned');
+  document.body.classList.remove('dragging-teacher-panel');
   teacherPanelEl.style.left = '';
   teacherPanelEl.style.top = '';
   teacherPanelEl.style.right = '';
@@ -688,19 +691,32 @@ function clampNumber(value, min, max) {
   return Math.min(Math.max(value, min), max);
 }
 
-function moveTeacherPanelTo(left, top) {
-  if (!teacherPanelEl) return;
+function getTeacherPanelBounds() {
   const rect = teacherPanelEl.getBoundingClientRect();
   const margin = 8;
   const maxLeft = Math.max(margin, window.innerWidth - rect.width - margin);
   const maxTop = Math.max(margin, window.innerHeight - rect.height - margin);
+  return { rect, margin, maxLeft, maxTop };
+}
+
+function moveTeacherPanelTo(left, top) {
+  if (!teacherPanelEl) return;
+  const { margin, maxLeft, maxTop } = getTeacherPanelBounds();
   const nextLeft = clampNumber(left, margin, maxLeft);
   const nextTop = clampNumber(top, margin, maxTop);
-  teacherPanelEl.style.left = `${nextLeft}px`;
-  teacherPanelEl.style.top = `${nextTop}px`;
+
+  // 拖曳後只使用 left/top 定位，避免和 CSS 原本的 right/bottom 混用造成游標偏移或面板跳走。
+  teacherPanelEl.style.left = `${Math.round(nextLeft)}px`;
+  teacherPanelEl.style.top = `${Math.round(nextTop)}px`;
   teacherPanelEl.style.right = 'auto';
   teacherPanelEl.style.bottom = 'auto';
   teacherPanelEl.classList.add('user-positioned');
+}
+
+function keepTeacherPanelInsideViewport() {
+  if (!teacherPanelEl || !teacherPanelEl.classList.contains('user-positioned')) return;
+  const rect = teacherPanelEl.getBoundingClientRect();
+  moveTeacherPanelTo(rect.left, rect.top);
 }
 
 function isTeacherPanelFloating() {
@@ -713,41 +729,64 @@ function setupTeacherPanelDrag() {
   teacherDragHandleEl.addEventListener('pointerdown', (event) => {
     if (!isTeacherPanelFloating()) return;
     event.preventDefault();
+
     const rect = teacherPanelEl.getBoundingClientRect();
+
     state.tutor.panelDrag = {
       active: true,
-      startX: event.clientX,
-      startY: event.clientY,
-      originX: rect.left,
-      originY: rect.top
+      pointerId: event.pointerId,
+      offsetX: event.clientX - rect.left,
+      offsetY: event.clientY - rect.top
     };
-    teacherPanelEl.classList.add('dragging');
-    teacherDragHandleEl.setPointerCapture?.(event.pointerId);
-  });
+
+    // 先把目前 CSS 計算出來的位置固定成 left/top，滑鼠才會一直對準原本抓住的位置。
+    teacherPanelEl.style.left = `${Math.round(rect.left)}px`;
+    teacherPanelEl.style.top = `${Math.round(rect.top)}px`;
+    teacherPanelEl.style.right = 'auto';
+    teacherPanelEl.style.bottom = 'auto';
+    teacherPanelEl.classList.add('dragging', 'user-positioned');
+    document.body.classList.add('dragging-teacher-panel');
+
+    try {
+      teacherDragHandleEl.setPointerCapture?.(event.pointerId);
+    } catch (error) {
+      // 某些瀏覽器在特殊情況下可能不能 capture，忽略即可，仍可用 window pointermove。
+    }
+  }, { passive: false });
 
   window.addEventListener('pointermove', (event) => {
     const drag = state.tutor.panelDrag;
     if (!drag.active) return;
+    if (drag.pointerId !== null && event.pointerId !== undefined && event.pointerId !== drag.pointerId) return;
     event.preventDefault();
+
     moveTeacherPanelTo(
-      drag.originX + event.clientX - drag.startX,
-      drag.originY + event.clientY - drag.startY
+      event.clientX - drag.offsetX,
+      event.clientY - drag.offsetY
     );
   }, { passive: false });
 
-  const endDrag = () => {
-    if (!state.tutor.panelDrag.active) return;
-    state.tutor.panelDrag.active = false;
+  const endDrag = (event) => {
+    const drag = state.tutor.panelDrag;
+    if (!drag.active) return;
+    if (drag.pointerId !== null && event?.pointerId !== undefined && event.pointerId !== drag.pointerId) return;
+
+    drag.active = false;
+    document.body.classList.remove('dragging-teacher-panel');
     teacherPanelEl.classList.remove('dragging');
+    keepTeacherPanelInsideViewport();
+
+    try {
+      if (event?.pointerId !== undefined) teacherDragHandleEl.releasePointerCapture?.(event.pointerId);
+    } catch (error) {
+      // pointer capture 可能已被瀏覽器釋放。
+    }
   };
 
   window.addEventListener('pointerup', endDrag);
   window.addEventListener('pointercancel', endDrag);
-  window.addEventListener('resize', () => {
-    if (!teacherPanelEl.classList.contains('user-positioned')) return;
-    const rect = teacherPanelEl.getBoundingClientRect();
-    moveTeacherPanelTo(rect.left, rect.top);
-  });
+  window.addEventListener('blur', endDrag);
+  window.addEventListener('resize', keepTeacherPanelInsideViewport);
 }
 
 function keepBoardVisibleDuringTeaching() {

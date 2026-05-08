@@ -1190,10 +1190,31 @@ body.tutor-active .teacher-panel {
 
 body.tutor-active .teacher-drag-handle {
   display: flex;
+  touch-action: none;
+  cursor: grab;
 }
 
 body.tutor-active .teacher-panel.user-positioned {
+  right: auto !important;
+  bottom: auto !important;
   box-shadow: 0 18px 50px rgba(6,73,91,.2);
+}
+
+body.tutor-active .teacher-panel.dragging {
+  opacity: 1 !important;
+  visibility: visible !important;
+  z-index: 80;
+  transition: none !important;
+  will-change: left, top;
+}
+
+body.dragging-teacher-panel {
+  cursor: grabbing;
+  user-select: none;
+}
+
+body.dragging-teacher-panel * {
+  cursor: grabbing !important;
 }
 
 body.tutor-active .shell {

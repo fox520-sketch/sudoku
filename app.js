@@ -209,6 +209,7 @@ const teacherDragHandleEl = $('#teacherDragHandle');
 const teacherResizeHandleEl = $('#teacherResizeHandle');
 const teacherPanelResetBtn = $('#teacherPanelResetBtn');
 const teacherPanelCollapseBtn = $('#teacherPanelCollapseBtn');
+const teacherPanelDockBtn = $('#teacherPanelDockBtn');
 const teacherPanelRescueBtn = $('#teacherPanelRescueBtn');
 const teacherPanelOriginalParent = teacherPanelEl?.parentNode || null;
 const teacherPanelOriginalNextSibling = teacherPanelEl?.nextSibling || null;
@@ -238,6 +239,7 @@ const state = {
     startedAtCurrent: [],
     panelRect: null,
     panelCollapsed: false,
+    panelSafeDock: false,
     visibilityWatchId: 0,
     panelWatchdogId: null,
     panelMissingCount: 0
@@ -685,7 +687,7 @@ function renderTeacherStep() {
 }
 
 
-const TEACHER_PANEL_STORAGE_KEY = 'oceanSudokuTeacherPanelRectV5';
+const TEACHER_PANEL_STORAGE_KEY = 'oceanSudokuTeacherPanelRectV6';
 const TEACHER_PANEL_COLLAPSED_KEY = 'oceanSudokuTeacherPanelCollapsedV1';
 const TEACHER_PANEL_MARGIN = 12;
 const TEACHER_PANEL_MIN_WIDTH = 320;
@@ -894,7 +896,7 @@ function startTeacherPanelWatchdog() {
     if (!isTeacherPanelElementVisible()) {
       state.tutor.panelMissingCount += 1;
       const fallback = state.tutor.panelMissingCount >= 2 ? getDefaultTeacherPanelRect() : (state.tutor.panelRect || getDefaultTeacherPanelRect());
-      applyTeacherPanelRect(fallback, { save: false });
+      if (!state.tutor.panelSafeDock) applyTeacherPanelRect(fallback, { save: false });
     } else {
       state.tutor.panelMissingCount = 0;
       state.tutor.panelRect = getCurrentTeacherPanelRect();
@@ -912,8 +914,42 @@ function toggleTeacherPanelCollapsed() {
   setTeacherPanelCollapsed(!state.tutor.panelCollapsed);
 }
 
+function updateTeacherPanelSafeDockUI() {
+  document.body.classList.toggle('teacher-safe-dock', !!state.tutor.panelSafeDock);
+  if (teacherPanelDockBtn) {
+    teacherPanelDockBtn.textContent = state.tutor.panelSafeDock ? '拖曳視窗' : '固定底部';
+    teacherPanelDockBtn.setAttribute('aria-pressed', String(!!state.tutor.panelSafeDock));
+    teacherPanelDockBtn.title = state.tutor.panelSafeDock
+      ? '回到可拖曳、可縮放的教學視窗'
+      : '固定到底部安全位置，避免拖曳位移或面板消失';
+  }
+  updateDebugInfo();
+}
+
+function setTeacherPanelSafeDock(value, options = {}) {
+  state.tutor.panelSafeDock = !!value;
+  updateTeacherPanelSafeDockUI();
+  if (state.tutor.panelSafeDock) {
+    mountTeacherPanelToBody({ force: true });
+    forceTeacherPanelPaint();
+    setTeacherPanelCollapsed(false, { save: false });
+    teacherPanelEl?.classList.add('free-teacher-window', 'teacher-panel-safe-visible');
+  } else if (options.restoreRect !== false && state.tutor.active && !isTeacherPanelMobile()) {
+    applyTeacherPanelRect(state.tutor.panelRect || getDefaultTeacherPanelRect(), { save: false });
+  }
+}
+
+function toggleTeacherPanelSafeDock() {
+  setTeacherPanelSafeDock(!state.tutor.panelSafeDock);
+  setMessage(state.tutor.panelSafeDock ? '教學面板已固定在底部安全位置。' : '教學面板已回到可拖曳視窗。');
+}
+
 function applyTeacherPanelRect(rect, options = {}) {
   if (!teacherPanelEl) return null;
+  if (state.tutor.panelSafeDock && options.allowWhenDocked !== true && !isTeacherPanelMobile()) {
+    updateTeacherPanelSafeDockUI();
+    return state.tutor.panelRect || normalizeTeacherPanelRect(rect);
+  }
   const normalized = normalizeTeacherPanelRect(rect);
   state.tutor.panelRect = normalized;
 
@@ -953,6 +989,7 @@ function loadTeacherPanelWindow() {
 
   // 按下「開始教學」時一律先展開，避免沿用先前收合狀態時誤以為面板不見。
   setTeacherPanelCollapsed(false, { save: false });
+  updateTeacherPanelSafeDockUI();
 
   if (isTeacherPanelMobile()) {
     teacherPanelEl.classList.add('free-teacher-window', 'teacher-panel-safe-visible');
@@ -976,7 +1013,9 @@ function loadTeacherPanelWindow() {
 function clearTeacherPanelWindowStyles() {
   stopTeacherPanelWatchdog();
   if (!teacherPanelEl) return;
-  document.body.classList.remove('dragging-teacher-panel', 'resizing-teacher-panel', 'teacher-panel-collapsed');
+  document.body.classList.remove('dragging-teacher-panel', 'resizing-teacher-panel', 'teacher-panel-collapsed', 'teacher-safe-dock');
+  state.tutor.panelSafeDock = false;
+  updateTeacherPanelSafeDockUI();
   teacherPanelEl.classList.remove('free-teacher-window', 'teacher-panel-safe-visible', 'teacher-panel-collapsed', 'dock-top-left', 'dock-top-right', 'dock-bottom-left', 'dock-bottom-right');
   teacherPanelEl.style.display = '';
   teacherPanelEl.style.visibility = '';
@@ -1003,6 +1042,7 @@ function resetTeacherPanelPosition() {
   document.body.classList.remove('dragging-teacher-panel', 'resizing-teacher-panel');
   setTeacherPanelCollapsed(false);
   clearSavedTeacherPanelRect();
+  setTeacherPanelSafeDock(false, { restoreRect: false });
 
   if (isTeacherPanelMobile()) {
     teacherPanelEl.classList.add('free-teacher-window', 'teacher-panel-safe-visible');
@@ -1051,7 +1091,7 @@ function setupTeacherPanelWindowControls() {
   const beginDrag = (event) => {
     if (event.button !== undefined && event.button !== 0) return;
     if (!document.body.classList.contains('tutor-active')) return;
-    if (isTeacherPanelMobile()) return;
+    if (isTeacherPanelMobile() || state.tutor.panelSafeDock) return;
     event.preventDefault();
     const rect = getCurrentTeacherPanelRect();
     mountTeacherPanelToBody({ force: true });
@@ -1100,7 +1140,7 @@ function setupTeacherPanelWindowControls() {
   const beginResize = (event) => {
     if (event.button !== undefined && event.button !== 0) return;
     if (!document.body.classList.contains('tutor-active')) return;
-    if (isTeacherPanelMobile()) return;
+    if (isTeacherPanelMobile() || state.tutor.panelSafeDock) return;
     event.preventDefault();
     const rect = getCurrentTeacherPanelRect();
     mountTeacherPanelToBody({ force: true });
@@ -1126,6 +1166,7 @@ function setupTeacherPanelWindowControls() {
   teacherDragHandleEl?.addEventListener('dblclick', resetTeacherPanelPosition);
   teacherResizeHandleEl?.addEventListener('pointerdown', beginResize, { passive: false });
   teacherPanelResetBtn?.addEventListener('click', resetTeacherPanelPosition);
+  teacherPanelDockBtn?.addEventListener('click', toggleTeacherPanelSafeDock);
   teacherPanelRescueBtn?.addEventListener('click', resetTeacherPanelPosition);
   teacherPanelCollapseBtn?.addEventListener('click', toggleTeacherPanelCollapsed);
 
@@ -1158,7 +1199,7 @@ function scheduleTeacherPanelVisibilityCheck() {
       if (!isTeacherPanelElementVisible()) {
         const fallback = getDefaultTeacherPanelRect();
         state.tutor.panelRect = fallback;
-        applyTeacherPanelRect(fallback, { save: false });
+        if (!state.tutor.panelSafeDock) applyTeacherPanelRect(fallback, { save: false });
       } else {
         state.tutor.panelRect = getCurrentTeacherPanelRect();
       }
@@ -1175,7 +1216,7 @@ function updateDebugInfo() {
   debugInfoEl.textContent = [
     `模式：${PLAY_MODES[state.playMode]?.label || state.playMode}`,
     `教學：${activeStep}`,
-    `教學面板：${isTeacherPanelMobile() ? '手機底部面板' : '桌面拖曳視窗'}${state.tutor.panelCollapsed ? '｜已收合' : ''}`,
+    `教學面板：${isTeacherPanelMobile() ? '手機底部面板' : (state.tutor.panelSafeDock ? '固定底部安全模式' : '桌面拖曳視窗')}${state.tutor.panelCollapsed ? '｜已收合' : ''}`,
     `面板位置：${panelRect}`,
     `Firebase：${state.room.configured ? '已設定' : '未設定'}`,
     `房間：${state.room.code || '單人'}`,
@@ -1215,13 +1256,14 @@ function ensureTeacherPanelVisible() {
     teacherPanelEl.style.width = '';
     teacherPanelEl.style.height = '';
     teacherPanelEl.style.maxHeight = '';
-  } else {
+  } else if (!state.tutor.panelSafeDock) {
     const candidate = isTeacherPanelRectVisible(state.tutor.panelRect)
       ? state.tutor.panelRect
       : getDefaultTeacherPanelRect();
     applyTeacherPanelRect(candidate, { save: false });
   }
 
+  updateTeacherPanelSafeDockUI();
   updateTeacherPanelCollapsedUI();
   updateTeacherFloatingRescueButton();
   scheduleTeacherPanelVisibilityCheck();
@@ -2274,6 +2316,10 @@ function bindEvents() {
       if (!isTeacherMode()) setPlayMode('teacher');
       else startTeacherMode();
     }
+    else if (isTeacherMode() && state.tutor.active && event.key.toLowerCase() === 'd') nextTeacherStep();
+    else if (isTeacherMode() && state.tutor.active && event.key.toLowerCase() === 'a') previousTeacherStep();
+    else if (isTeacherMode() && state.tutor.active && event.key.toLowerCase() === 'r') resetTeacherMode();
+    else if (isTeacherMode() && state.tutor.active && event.key.toLowerCase() === 'f') toggleTeacherPanelSafeDock();
     else if (event.key === 'ArrowUp') { event.preventDefault(); moveSelection(-1, 0); }
     else if (event.key === 'ArrowDown') { event.preventDefault(); moveSelection(1, 0); }
     else if (event.key === 'ArrowLeft') { event.preventDefault(); moveSelection(0, -1); }

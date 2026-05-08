@@ -62,33 +62,7 @@
           <pre id="debugInfo">狀態初始化中...</pre>
         </details>
 
-        <section class="teacher-panel" aria-label="電腦解題教學">
-          <div class="teacher-heading">
-            <div>
-              <p class="mini-eyebrow">Tutor</p>
-              <h2>電腦解題教學</h2>
-            </div>
-            <span id="teacherBadge" class="teacher-badge">未開始</span>
-          </div>
-          <div id="teacherWindowBar" class="teacher-window-bar" aria-label="移動與縮放電腦教學面板">
-            <div id="teacherDragHandle" class="teacher-drag-handle" role="button" tabindex="0" aria-label="拖曳移動教學面板">拖曳移動教學面板</div>
-            <button id="teacherPanelCollapseBtn" class="dock-btn" type="button" aria-pressed="false">收合</button>
-            <button id="teacherPanelResetBtn" class="dock-btn" type="button">重設位置</button>
-            <button id="teacherPanelRescueBtn" class="dock-btn rescue" type="button" title="面板不見時可按此鍵救援">救援顯示</button>
-          </div>
-          <p id="teacherStatus" class="teacher-status">選好題目後，按「開始教學」，電腦會從原題開始，一步一步示範如何思考。</p>
-          <div class="teacher-actions">
-            <button id="teacherStartBtn" class="tool" type="button">開始教學</button>
-            <button id="teacherPrevBtn" class="tool" type="button" disabled>上一步</button>
-            <button id="teacherNextBtn" class="tool" type="button" disabled>下一步</button>
-            <button id="teacherResetBtn" class="tool" type="button" disabled>結束教學</button>
-          </div>
-          <article id="teacherStep" class="teacher-step">
-            <strong>教學模式會說明：</strong>
-            <span>候選數、唯一候選、隱性唯一，以及必要時的進階推理示範。</span>
-          </article>
-          <div id="teacherResizeHandle" class="teacher-resize-handle" aria-label="拖曳縮放教學面板" title="拖曳縮放教學面板"></div>
-        </section>
+
 
       </section>
 
@@ -141,6 +115,37 @@
       </aside>
     </main>
   </div>
+
+
+  <!-- 教學面板放在 body 最外層，避免被數獨卡片、grid、backdrop-filter 等父層影響而消失。 -->
+        <section class="teacher-panel" aria-label="電腦解題教學">
+          <div class="teacher-heading">
+            <div>
+              <p class="mini-eyebrow">Tutor</p>
+              <h2>電腦解題教學</h2>
+            </div>
+            <span id="teacherBadge" class="teacher-badge">未開始</span>
+          </div>
+          <div id="teacherWindowBar" class="teacher-window-bar" aria-label="移動與縮放電腦教學面板">
+            <div id="teacherDragHandle" class="teacher-drag-handle" role="button" tabindex="0" aria-label="拖曳移動教學面板">拖曳移動教學面板</div>
+            <button id="teacherPanelCollapseBtn" class="dock-btn" type="button" aria-pressed="false">收合</button>
+            <button id="teacherPanelResetBtn" class="dock-btn" type="button">重設位置</button>
+            <button id="teacherPanelDockBtn" class="dock-btn" type="button" aria-pressed="false" title="切換為固定底部面板，避免拖曳造成位移">固定底部</button>
+            <button id="teacherPanelRescueBtn" class="dock-btn rescue" type="button" title="面板不見時可按此鍵救援">救援顯示</button>
+          </div>
+          <p id="teacherStatus" class="teacher-status">選好題目後，按「開始教學」，電腦會從原題開始，一步一步示範如何思考。</p>
+          <div class="teacher-actions">
+            <button id="teacherStartBtn" class="tool" type="button">開始教學</button>
+            <button id="teacherPrevBtn" class="tool" type="button" disabled>上一步</button>
+            <button id="teacherNextBtn" class="tool" type="button" disabled>下一步</button>
+            <button id="teacherResetBtn" class="tool" type="button" disabled>結束教學</button>
+          </div>
+          <article id="teacherStep" class="teacher-step">
+            <strong>教學模式會說明：</strong>
+            <span>候選數、唯一候選、隱性唯一，以及必要時的進階推理示範。</span>
+          </article>
+          <div id="teacherResizeHandle" class="teacher-resize-handle" aria-label="拖曳縮放教學面板" title="拖曳縮放教學面板"></div>
+        </section>
 
   <div id="loading" class="overlay" hidden>
     <div class="loader card" role="status" aria-live="assertive">

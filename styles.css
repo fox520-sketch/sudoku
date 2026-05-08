@@ -1378,7 +1378,7 @@ body.teacher-mode:not(.tutor-active) .teacher-panel {
 /* 教學面板：桌面拖曳 + 縮放，手機底部抽屜 */
 .teacher-window-bar {
   display: none;
-  grid-template-columns: minmax(0, 1fr) auto auto auto;
+  grid-template-columns: minmax(0, 1fr) auto auto auto auto;
   align-items: center;
   gap: 8px;
   border-radius: 18px;
@@ -1562,7 +1562,7 @@ body[data-theme="dusk"] .teacher-drag-handle {
   }
 
   body.tutor-active .teacher-window-bar {
-    grid-template-columns: 1fr auto auto;
+    grid-template-columns: 1fr auto auto auto auto;
     padding: 6px;
     position: sticky;
     top: 0;
@@ -1611,6 +1611,41 @@ body[data-theme="dusk"] .teacher-drag-handle {
   }
 }
 
+/* 教學面板現在放在 body 最外層：未開始教學時仍保持像卡片一樣出現在盤面下方。 */
+body.teacher-mode:not(.tutor-active) > .teacher-panel {
+  width: min(760px, calc(100% - 28px));
+  margin: -8px auto 28px;
+}
+
+/* 固定底部安全模式：當使用者不想拖曳，或面板曾經消失時，可以改用穩定停靠。 */
+body.tutor-active.teacher-safe-dock .teacher-panel.teacher-panel-safe-visible,
+body.tutor-active.teacher-safe-dock > .teacher-panel.teacher-panel-safe-visible {
+  left: max(12px, calc((100vw - 760px) / 2)) !important;
+  right: auto !important;
+  top: auto !important;
+  bottom: max(12px, env(safe-area-inset-bottom)) !important;
+  width: min(760px, calc(100vw - 24px)) !important;
+  height: auto !important;
+  min-width: 0 !important;
+  min-height: 0 !important;
+  max-width: calc(100vw - 24px) !important;
+  max-height: min(44vh, 420px) !important;
+  overflow: auto !important;
+  padding-bottom: 16px !important;
+}
+
+body.tutor-active.teacher-safe-dock .teacher-resize-handle {
+  display: none !important;
+}
+
+body.tutor-active.teacher-safe-dock .teacher-drag-handle {
+  cursor: default;
+}
+
+body.tutor-active.teacher-safe-dock .teacher-drag-handle::before {
+  content: "▣";
+}
+
 /* 穩定性強化：教學面板救援與可視範圍保護 */
 body.tutor-active .teacher-panel.teacher-panel-safe-visible,
 body.tutor-active > .teacher-panel.teacher-panel-safe-visible {
@@ -1655,7 +1690,9 @@ body:not(.tutor-active) .teacher-floating-rescue {
 
 @media (max-width: 860px) {
   body.tutor-active .teacher-panel.teacher-panel-safe-visible,
-  body.tutor-active > .teacher-panel.teacher-panel-safe-visible {
+  body.tutor-active > .teacher-panel.teacher-panel-safe-visible,
+  body.tutor-active.teacher-safe-dock .teacher-panel.teacher-panel-safe-visible,
+  body.tutor-active.teacher-safe-dock > .teacher-panel.teacher-panel-safe-visible {
     left: 10px !important;
     right: auto !important;
     top: auto !important;
@@ -1676,6 +1713,6 @@ body:not(.tutor-active) .teacher-floating-rescue {
   }
 
   .teacher-window-bar {
-    grid-template-columns: minmax(0, 1fr) auto auto auto;
+    grid-template-columns: minmax(0, 1fr) auto auto auto auto;
   }
 }

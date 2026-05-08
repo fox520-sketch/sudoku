@@ -122,6 +122,7 @@ const THEMES = {
 
 const $ = (selector) => document.querySelector(selector);
 const boardEl = $('#board');
+const boardPanelEl = document.querySelector('.board-panel');
 const padEl = $('#numberPad');
 const messageEl = $('#message');
 const timerEl = $('#timer');
@@ -553,6 +554,7 @@ function updateTeacherControls() {
   const total = state.tutor.steps.length;
   const stepIndex = state.tutor.stepIndex;
   const roomMode = isInRoom();
+  document.body.classList.toggle('tutor-active', active);
 
   teacherStartBtn.disabled = state.busy || roomMode;
   teacherPrevBtn.disabled = state.busy || !active || stepIndex <= 0;
@@ -600,6 +602,19 @@ function renderTeacherStep() {
   `;
 }
 
+function keepBoardVisibleDuringTeaching() {
+  if (!boardPanelEl) return;
+  const prefersReducedMotion = window.matchMedia?.('(prefers-reduced-motion: reduce)')?.matches;
+  const behavior = prefersReducedMotion ? 'auto' : 'smooth';
+  const isNarrow = window.matchMedia?.('(max-width: 860px)')?.matches;
+  const rect = boardEl.getBoundingClientRect();
+  const boardMostlyVisible = rect.top >= 72 && rect.bottom <= window.innerHeight - 72;
+
+  if (isNarrow || !boardMostlyVisible) {
+    boardPanelEl.scrollIntoView({ behavior, block: 'start' });
+  }
+}
+
 function startTeacherMode() {
   if (isInRoom()) {
     setMessage('多人房間中請先離開房間，再使用電腦解題教學。');
@@ -628,6 +643,7 @@ function startTeacherMode() {
   renderBoard();
   renderTeacherStep();
   setMessage(`電腦教學已開始，共 ${steps.length} 步。按「下一步」開始推理。`);
+  setTimeout(keepBoardVisibleDuringTeaching, 60);
 }
 
 function applyTutorialBoard(stepCount) {
@@ -664,6 +680,7 @@ function nextTeacherStep() {
 
   renderBoard();
   renderTeacherStep();
+  setTimeout(keepBoardVisibleDuringTeaching, 60);
 }
 
 function previousTeacherStep() {
@@ -675,6 +692,7 @@ function previousTeacherStep() {
   renderBoard();
   renderTeacherStep();
   setMessage(state.tutor.stepIndex === 0 ? '已回到教學起點。' : `已回到第 ${state.tutor.stepIndex} 步。`);
+  setTimeout(keepBoardVisibleDuringTeaching, 60);
 }
 
 function resetTeacherMode() {
@@ -731,6 +749,9 @@ function buildPad() {
 
 function renderBoard() {
   const selectedValue = state.selected >= 0 ? state.current[state.selected] : 0;
+  const tutorialFocusIndex = state.tutor.active && state.tutor.stepIndex > 0
+    ? state.tutor.steps[state.tutor.stepIndex - 1]?.index
+    : -1;
   [...boardEl.children].forEach((cell, index) => {
     const value = state.current[index];
     const isSelected = index === state.selected;
@@ -747,6 +768,7 @@ function renderBoard() {
     if (isPeer) cell.classList.add('peer');
     if (isSame) cell.classList.add('same');
     if (isSelected) cell.classList.add('selected');
+    if (index === tutorialFocusIndex) cell.classList.add('tutorial-focus');
     if (isWrong) cell.classList.add('error');
 
     cell.innerHTML = '';

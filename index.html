@@ -40,6 +40,28 @@
         <div id="board" class="board" role="grid" aria-label="9乘9數獨盤面"></div>
 
         <div class="message" id="message">選一格，再輸入數字。</div>
+
+        <section class="teacher-panel" aria-label="電腦解題教學">
+          <div class="teacher-heading">
+            <div>
+              <p class="mini-eyebrow">Tutor</p>
+              <h2>電腦解題教學</h2>
+            </div>
+            <span id="teacherBadge" class="teacher-badge">未開始</span>
+          </div>
+          <p id="teacherStatus" class="teacher-status">選好題目後，按「開始教學」，電腦會從原題開始，一步一步示範如何思考。</p>
+          <div class="teacher-actions">
+            <button id="teacherStartBtn" class="tool" type="button">開始教學</button>
+            <button id="teacherPrevBtn" class="tool" type="button" disabled>上一步</button>
+            <button id="teacherNextBtn" class="tool" type="button" disabled>下一步</button>
+            <button id="teacherResetBtn" class="tool" type="button" disabled>結束教學</button>
+          </div>
+          <article id="teacherStep" class="teacher-step">
+            <strong>教學模式會說明：</strong>
+            <span>候選數、唯一候選、隱性唯一，以及必要時的進階推理示範。</span>
+          </article>
+        </section>
+
       </section>
 
       <aside class="side-panel card" aria-label="操作面板">
@@ -80,27 +102,6 @@
         </div>
 
         <div class="number-pad" id="numberPad" aria-label="數字鍵盤"></div>
-
-        <section class="teacher-panel" aria-label="電腦解題教學">
-          <div class="teacher-heading">
-            <div>
-              <p class="mini-eyebrow">Tutor</p>
-              <h2>電腦解題教學</h2>
-            </div>
-            <span id="teacherBadge" class="teacher-badge">未開始</span>
-          </div>
-          <p id="teacherStatus" class="teacher-status">選好題目後，按「開始教學」，電腦會從原題開始，一步一步示範如何思考。</p>
-          <div class="teacher-actions">
-            <button id="teacherStartBtn" class="tool" type="button">開始教學</button>
-            <button id="teacherPrevBtn" class="tool" type="button" disabled>上一步</button>
-            <button id="teacherNextBtn" class="tool" type="button" disabled>下一步</button>
-            <button id="teacherResetBtn" class="tool" type="button" disabled>結束教學</button>
-          </div>
-          <article id="teacherStep" class="teacher-step">
-            <strong>教學模式會說明：</strong>
-            <span>候選數、唯一候選、隱性唯一，以及必要時的進階推理示範。</span>
-          </article>
-        </section>
 
         <details class="help">
           <summary>玩法說明</summary>

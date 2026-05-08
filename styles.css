@@ -647,10 +647,12 @@ select:focus {
 .teacher-panel {
   display: grid;
   gap: 12px;
-  margin: 18px 0;
-  padding: 16px 0;
-  border-top: 1px solid var(--line);
-  border-bottom: 1px solid var(--line);
+  margin: 16px 0 0;
+  padding: 16px;
+  border: 1px solid var(--line);
+  border-radius: 22px;
+  background: color-mix(in srgb, var(--peer) 48%, white);
+  box-shadow: 0 10px 28px rgba(6,73,91,.08);
 }
 
 .teacher-heading {
@@ -689,17 +691,19 @@ select:focus {
 
 .teacher-actions {
   display: grid;
-  grid-template-columns: 1fr 1fr;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
   gap: 8px;
 }
 
 .teacher-step {
   display: grid;
   gap: 8px;
-  min-height: 124px;
+  min-height: 96px;
+  max-height: 15rem;
+  overflow: auto;
   padding: 14px;
   border-radius: 18px;
-  background: color-mix(in srgb, var(--peer) 72%, white);
+  background: rgba(255,255,255,.72);
   border: 1px solid var(--line);
   color: var(--ink);
   line-height: 1.65;
@@ -715,8 +719,15 @@ select:focus {
   color: var(--muted);
 }
 
+.cell.tutorial-focus {
+  box-shadow: inset 0 0 0 4px color-mix(in srgb, var(--ocean) 78%, white), 0 0 0 3px rgba(255,255,255,.72);
+  animation: tutorPulse .75s ease;
+  z-index: 2;
+}
+
 @keyframes spin { to { transform: rotate(360deg); } }
 @keyframes pop { 50% { transform: scale(1.08); } }
+@keyframes tutorPulse { 50% { transform: scale(1.05); } }
 
 @media (max-width: 860px) {
   .hero { align-items: stretch; flex-direction: column; }
@@ -754,17 +765,32 @@ select:focus {
   .number-pad { order: 2; }
 
   .teacher-panel {
-    order: 3;
-    margin: 0;
-    padding: 14px 0;
+    margin-top: 12px;
+    padding: 12px;
+    position: sticky;
+    bottom: max(8px, env(safe-area-inset-bottom));
+    z-index: 5;
+    backdrop-filter: blur(16px);
   }
+
+  .teacher-heading h2 { font-size: 1.05rem; }
+
+  .teacher-status { font-size: .86rem; }
 
   .teacher-actions {
     grid-template-columns: 1fr 1fr;
   }
 
+  .teacher-step {
+    min-height: 0;
+    max-height: 28svh;
+    padding: 10px;
+    font-size: .9rem;
+    line-height: 1.5;
+  }
+
   .help {
-    order: 4;
+    order: 3;
     margin-top: 0;
   }
 
@@ -785,4 +811,67 @@ select:focus {
 
 .overlay[hidden] {
   display: none !important;
+}
+
+/* 教學進行中：把教學面板變成浮動教學欄，讓數獨盤面和「下一步」可以同時看到。 */
+body.tutor-active .teacher-panel {
+  position: fixed;
+  right: max(18px, calc((100vw - 1120px) / 2 + 18px));
+  bottom: max(14px, env(safe-area-inset-bottom));
+  width: min(420px, calc(100vw - 32px));
+  max-height: min(46svh, 390px);
+  overflow: auto;
+  z-index: 30;
+  margin: 0;
+  background: color-mix(in srgb, var(--card) 86%, white);
+  backdrop-filter: blur(18px);
+  border: 1px solid var(--line);
+}
+
+body.tutor-active .shell {
+  padding-bottom: max(300px, calc(300px + env(safe-area-inset-bottom)));
+}
+
+body.tutor-active .board {
+  width: min(100%, 560px);
+}
+
+body.tutor-active .teacher-step {
+  max-height: 10.5rem;
+  min-height: 0;
+}
+
+@media (max-width: 860px) {
+  body.tutor-active .teacher-panel {
+    left: 10px;
+    right: 10px;
+    bottom: max(8px, env(safe-area-inset-bottom));
+    width: auto;
+    max-height: 34svh;
+    padding: 10px;
+  }
+
+  body.tutor-active .teacher-heading,
+  body.tutor-active .teacher-status {
+    display: none;
+  }
+
+  body.tutor-active .teacher-step {
+    max-height: 18svh;
+    font-size: .86rem;
+  }
+
+  body.tutor-active .teacher-actions {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+  }
+
+  body.tutor-active .teacher-actions .tool {
+    min-height: 40px;
+    padding: 0 6px;
+    font-size: .86rem;
+  }
+
+  body.tutor-active .shell {
+    padding-bottom: max(210px, calc(210px + env(safe-area-inset-bottom)));
+  }
 }

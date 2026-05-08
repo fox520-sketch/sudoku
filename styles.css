@@ -1716,3 +1716,105 @@ body:not(.tutor-active) .teacher-floating-rescue {
     grid-template-columns: minmax(0, 1fr) auto auto auto auto;
   }
 }
+
+/* 手機教學面板改善：可拖曳、文字精簡、工具列不再擠到直排。 */
+.teacher-step .teacher-summary {
+  color: var(--control-text);
+  font-weight: 900;
+}
+
+.teacher-step .teacher-detail {
+  border-top: 1px solid var(--line);
+  padding-top: 7px;
+}
+
+.teacher-step .teacher-detail summary {
+  cursor: pointer;
+  color: var(--ocean-deep);
+  font-weight: 950;
+  user-select: none;
+}
+
+.teacher-step .teacher-detail[open] {
+  display: grid;
+  gap: 6px;
+}
+
+@media (max-width: 860px) {
+  body.tutor-active .teacher-panel.teacher-panel-safe-visible.teacher-panel-mobile-dragged,
+  body.tutor-active > .teacher-panel.teacher-panel-safe-visible.teacher-panel-mobile-dragged {
+    bottom: auto !important;
+    max-height: min(38vh, 310px) !important;
+  }
+
+  body.tutor-active .teacher-panel.free-teacher-window,
+  body.tutor-active .teacher-panel.teacher-panel-safe-visible {
+    gap: 7px !important;
+    padding: 8px 8px 12px !important;
+  }
+
+  body.tutor-active .teacher-window-bar {
+    grid-template-columns: minmax(72px, 1fr) repeat(4, minmax(42px, auto)) !important;
+    gap: 4px !important;
+    padding: 5px !important;
+  }
+
+  body.tutor-active .teacher-drag-handle {
+    min-height: 30px !important;
+    padding: 0 8px !important;
+    white-space: nowrap !important;
+    overflow: hidden !important;
+    text-overflow: ellipsis !important;
+    justify-content: center !important;
+    cursor: grab !important;
+  }
+
+  body.tutor-active .teacher-drag-handle::before {
+    content: "↕" !important;
+  }
+
+  body.tutor-active .dock-btn {
+    min-width: 0 !important;
+    min-height: 30px !important;
+    padding: 0 6px !important;
+    font-size: .76rem !important;
+    white-space: nowrap !important;
+  }
+
+  body.tutor-active .teacher-actions {
+    grid-template-columns: repeat(4, minmax(0, 1fr)) !important;
+    gap: 5px !important;
+  }
+
+  body.tutor-active .teacher-actions .tool {
+    min-height: 34px !important;
+    padding: 0 4px !important;
+    font-size: .76rem !important;
+    border-radius: 14px !important;
+  }
+
+  body.tutor-active .teacher-step {
+    max-height: 7.2rem !important;
+    min-height: 0 !important;
+    padding: 8px !important;
+    gap: 5px !important;
+    font-size: .84rem !important;
+    line-height: 1.42 !important;
+  }
+
+  body.tutor-active .teacher-step strong {
+    font-size: .9rem !important;
+  }
+
+  body.tutor-active .teacher-step .teacher-detail:not([open]) span {
+    display: none !important;
+  }
+
+  body.tutor-active .teacher-step .teacher-detail summary {
+    font-size: .82rem !important;
+  }
+
+  body.tutor-active .shell {
+    padding-bottom: max(185px, calc(185px + env(safe-area-inset-bottom))) !important;
+  }
+}

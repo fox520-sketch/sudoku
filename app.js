@@ -209,6 +209,7 @@ const teacherDragHandleEl = $('#teacherDragHandle');
 const teacherResizeHandleEl = $('#teacherResizeHandle');
 const teacherPanelResetBtn = $('#teacherPanelResetBtn');
 const teacherPanelCollapseBtn = $('#teacherPanelCollapseBtn');
+const teacherPanelRescueBtn = $('#teacherPanelRescueBtn');
 const teacherPanelOriginalParent = teacherPanelEl?.parentNode || null;
 const teacherPanelOriginalNextSibling = teacherPanelEl?.nextSibling || null;
 
@@ -236,7 +237,8 @@ const state = {
     stepIndex: 0,
     startedAtCurrent: [],
     panelRect: null,
-    panelCollapsed: false
+    panelCollapsed: false,
+    visibilityWatchId: 0
   },
   room: {
     configured: false,
@@ -639,6 +641,7 @@ function updateTeacherControls() {
   if (active && teacherMode) {
     requestAnimationFrame(ensureTeacherPanelVisible);
   }
+  updateTeacherFloatingRescueButton();
   updateDebugInfo();
 }
 
@@ -686,6 +689,7 @@ const TEACHER_PANEL_MIN_WIDTH = 320;
 const TEACHER_PANEL_MIN_HEIGHT = 230;
 const TEACHER_PANEL_DEFAULT_WIDTH = 440;
 const TEACHER_PANEL_DEFAULT_HEIGHT = 370;
+const TEACHER_PANEL_SAFE_Z_INDEX = 2147483000;
 const TEACHER_PANEL_MOBILE_QUERY = '(max-width: 860px)';
 
 function clamp(value, min, max) {
@@ -707,7 +711,8 @@ function readSavedTeacherPanelRect() {
     if (!raw) return null;
     const rect = JSON.parse(raw);
     if (![rect.x, rect.y, rect.width, rect.height].every((value) => Number.isFinite(Number(value)))) return null;
-    return rect;
+    const normalized = normalizeTeacherPanelRect(rect);
+    return isTeacherPanelRectVisible(normalized) ? normalized : null;
   } catch (_) {
     return null;
   }
@@ -737,13 +742,14 @@ function saveTeacherPanelCollapsed(value) {
   }
 }
 
-function mountTeacherPanelToBody() {
+function mountTeacherPanelToBody(options = {}) {
   if (!teacherPanelEl) return;
   teacherPanelEl.classList.add('teacher-panel-portaled');
 
-  // 桌面浮動視窗必須搬到 body 底下，避免 board-panel/card 的 backdrop-filter
-  // 建立新的 containing block，導致 position: fixed 被算到畫面外而看不見。
-  if (!isTeacherPanelMobile() && teacherPanelEl.parentNode !== document.body) {
+  // 教學啟動後一律搬到 body 底下，避免任何父層 grid/card/backdrop-filter
+  // 建立 containing block，造成 fixed 面板算到畫面外。手機與桌面都使用同一套安全掛載。
+  const shouldPortal = options.force || state.tutor.active || !isTeacherPanelMobile();
+  if (shouldPortal && teacherPanelEl.parentNode !== document.body) {
     document.body.appendChild(teacherPanelEl);
   }
 }
@@ -784,6 +790,65 @@ function normalizeTeacherPanelRect(rect) {
   return { x, y, width, height };
 }
 
+function isTeacherPanelRectVisible(rect) {
+  if (!rect) return false;
+  const width = Number(rect.width);
+  const height = Number(rect.height);
+  const x = Number(rect.x);
+  const y = Number(rect.y);
+  if (![x, y, width, height].every(Number.isFinite)) return false;
+  if (width < 180 || height < 120) return false;
+  const visibleWidth = Math.min(window.innerWidth, x + width) - Math.max(0, x);
+  const visibleHeight = Math.min(window.innerHeight, y + height) - Math.max(0, y);
+  return visibleWidth >= 120 && visibleHeight >= 90;
+}
+
+function isTeacherPanelElementVisible() {
+  if (!teacherPanelEl) return false;
+  const style = window.getComputedStyle(teacherPanelEl);
+  const rect = teacherPanelEl.getBoundingClientRect();
+  if (style.display === 'none' || style.visibility === 'hidden' || Number(style.opacity) === 0) return false;
+  if (rect.width <= 0 || rect.height <= 0) return false;
+  const visibleWidth = Math.min(window.innerWidth, rect.right) - Math.max(0, rect.left);
+  const visibleHeight = Math.min(window.innerHeight, rect.bottom) - Math.max(0, rect.top);
+  return visibleWidth >= 100 && visibleHeight >= 80;
+}
+
+function forceTeacherPanelPaint() {
+  if (!teacherPanelEl) return;
+  teacherPanelEl.hidden = false;
+  teacherPanelEl.classList.add('teacher-panel-safe-visible');
+  teacherPanelEl.style.display = 'grid';
+  teacherPanelEl.style.visibility = 'visible';
+  teacherPanelEl.style.opacity = '1';
+  teacherPanelEl.style.pointerEvents = 'auto';
+  teacherPanelEl.style.zIndex = String(TEACHER_PANEL_SAFE_Z_INDEX);
+}
+
+function clearSavedTeacherPanelRect() {
+  try { localStorage.removeItem(TEACHER_PANEL_STORAGE_KEY); } catch (_) {}
+}
+
+function getTeacherFloatingRescueButton() {
+  let button = document.getElementById('teacherFloatingRescueBtn');
+  if (button) return button;
+  button = document.createElement('button');
+  button.id = 'teacherFloatingRescueBtn';
+  button.type = 'button';
+  button.className = 'teacher-floating-rescue';
+  button.textContent = '找回教學面板';
+  button.title = '如果電腦教學面板不見，按這裡重設到可視範圍';
+  button.hidden = true;
+  button.addEventListener('click', resetTeacherPanelPosition);
+  document.body.appendChild(button);
+  return button;
+}
+
+function updateTeacherFloatingRescueButton() {
+  const button = getTeacherFloatingRescueButton();
+  button.hidden = !(state.tutor.active && isTeacherMode());
+}
+
 function updateTeacherPanelCollapsedUI() {
   if (!teacherPanelEl) return;
   teacherPanelEl.classList.toggle('teacher-panel-collapsed', !!state.tutor.panelCollapsed);
@@ -811,7 +876,9 @@ function applyTeacherPanelRect(rect, options = {}) {
   state.tutor.panelRect = normalized;
 
   teacherPanelEl.classList.remove('dock-top-left', 'dock-top-right', 'dock-bottom-left', 'dock-bottom-right');
-  teacherPanelEl.classList.add('free-teacher-window');
+  teacherPanelEl.classList.add('free-teacher-window', 'teacher-panel-safe-visible');
+  forceTeacherPanelPaint();
+  teacherPanelEl.style.position = 'fixed';
   teacherPanelEl.style.left = `${normalized.x}px`;
   teacherPanelEl.style.top = `${normalized.y}px`;
   teacherPanelEl.style.right = 'auto';
@@ -838,32 +905,40 @@ function getCurrentTeacherPanelRect() {
 
 function loadTeacherPanelWindow() {
   if (!teacherPanelEl) return;
-  mountTeacherPanelToBody();
+  mountTeacherPanelToBody({ force: true });
+  forceTeacherPanelPaint();
 
   // 按下「開始教學」時一律先展開，避免沿用先前收合狀態時誤以為面板不見。
   setTeacherPanelCollapsed(false, { save: false });
 
   if (isTeacherPanelMobile()) {
-    // 手機版維持底部抽屜樣式，不套用桌面 left/top 尺寸，避免被放到可視範圍外。
-    clearTeacherPanelWindowStyles();
-    mountTeacherPanelToBody();
-    teacherPanelEl.classList.add('free-teacher-window');
+    teacherPanelEl.classList.add('free-teacher-window', 'teacher-panel-safe-visible');
+    teacherPanelEl.style.left = '';
+    teacherPanelEl.style.top = '';
+    teacherPanelEl.style.right = '';
+    teacherPanelEl.style.bottom = '';
+    teacherPanelEl.style.width = '';
+    teacherPanelEl.style.height = '';
+    teacherPanelEl.style.maxHeight = '';
+    scheduleTeacherPanelVisibilityCheck();
     return;
   }
 
   const saved = readSavedTeacherPanelRect();
   const normalized = normalizeTeacherPanelRect(saved || getDefaultTeacherPanelRect());
   applyTeacherPanelRect(normalized, { save: false });
-  requestAnimationFrame(() => {
-    mountTeacherPanelToBody();
-    applyTeacherPanelRect(state.tutor.panelRect || normalized, { save: false });
-  });
+  scheduleTeacherPanelVisibilityCheck();
 }
 
 function clearTeacherPanelWindowStyles() {
   if (!teacherPanelEl) return;
   document.body.classList.remove('dragging-teacher-panel', 'resizing-teacher-panel', 'teacher-panel-collapsed');
-  teacherPanelEl.classList.remove('free-teacher-window', 'teacher-panel-collapsed', 'dock-top-left', 'dock-top-right', 'dock-bottom-left', 'dock-bottom-right');
+  teacherPanelEl.classList.remove('free-teacher-window', 'teacher-panel-safe-visible', 'teacher-panel-collapsed', 'dock-top-left', 'dock-top-right', 'dock-bottom-left', 'dock-bottom-right');
+  teacherPanelEl.style.display = '';
+  teacherPanelEl.style.visibility = '';
+  teacherPanelEl.style.opacity = '';
+  teacherPanelEl.style.pointerEvents = '';
+  teacherPanelEl.style.position = '';
   teacherPanelEl.style.left = '';
   teacherPanelEl.style.top = '';
   teacherPanelEl.style.right = '';
@@ -871,16 +946,34 @@ function clearTeacherPanelWindowStyles() {
   teacherPanelEl.style.width = '';
   teacherPanelEl.style.height = '';
   teacherPanelEl.style.maxHeight = '';
+  teacherPanelEl.style.zIndex = '';
   restoreTeacherPanelToOriginalPlace();
+  updateTeacherFloatingRescueButton();
   updateDebugInfo();
 }
 
 function resetTeacherPanelPosition() {
   if (!teacherPanelEl) return;
-  mountTeacherPanelToBody();
+  mountTeacherPanelToBody({ force: true });
+  forceTeacherPanelPaint();
   document.body.classList.remove('dragging-teacher-panel', 'resizing-teacher-panel');
   setTeacherPanelCollapsed(false);
-  applyTeacherPanelRect(getDefaultTeacherPanelRect());
+  clearSavedTeacherPanelRect();
+
+  if (isTeacherPanelMobile()) {
+    teacherPanelEl.classList.add('free-teacher-window', 'teacher-panel-safe-visible');
+    teacherPanelEl.style.left = '';
+    teacherPanelEl.style.top = '';
+    teacherPanelEl.style.right = '';
+    teacherPanelEl.style.bottom = '';
+    teacherPanelEl.style.width = '';
+    teacherPanelEl.style.height = '';
+    teacherPanelEl.style.maxHeight = '';
+  } else {
+    applyTeacherPanelRect(getDefaultTeacherPanelRect());
+  }
+
+  scheduleTeacherPanelVisibilityCheck();
   setMessage('教學面板位置已重設。');
 }
 
@@ -917,7 +1010,8 @@ function setupTeacherPanelWindowControls() {
     if (isTeacherPanelMobile()) return;
     event.preventDefault();
     const rect = getCurrentTeacherPanelRect();
-    mountTeacherPanelToBody();
+    mountTeacherPanelToBody({ force: true });
+    forceTeacherPanelPaint();
     setTeacherPanelCollapsed(false);
     applyTeacherPanelRect(rect, { save: false });
     dragState = {
@@ -965,7 +1059,8 @@ function setupTeacherPanelWindowControls() {
     if (isTeacherPanelMobile()) return;
     event.preventDefault();
     const rect = getCurrentTeacherPanelRect();
-    mountTeacherPanelToBody();
+    mountTeacherPanelToBody({ force: true });
+    forceTeacherPanelPaint();
     setTeacherPanelCollapsed(false);
     applyTeacherPanelRect(rect, { save: false });
     resizeState = {
@@ -986,6 +1081,7 @@ function setupTeacherPanelWindowControls() {
   teacherDragHandleEl?.addEventListener('pointerdown', beginDrag, { passive: false });
   teacherResizeHandleEl?.addEventListener('pointerdown', beginResize, { passive: false });
   teacherPanelResetBtn?.addEventListener('click', resetTeacherPanelPosition);
+  teacherPanelRescueBtn?.addEventListener('click', resetTeacherPanelPosition);
   teacherPanelCollapseBtn?.addEventListener('click', toggleTeacherPanelCollapsed);
 
   window.addEventListener('resize', () => {
@@ -993,6 +1089,35 @@ function setupTeacherPanelWindowControls() {
       applyTeacherPanelRect(state.tutor.panelRect || getCurrentTeacherPanelRect(), { save: false });
     }
     updateDebugInfo();
+  });
+}
+
+function scheduleTeacherPanelVisibilityCheck() {
+  state.tutor.visibilityWatchId = (state.tutor.visibilityWatchId || 0) + 1;
+  const watchId = state.tutor.visibilityWatchId;
+  const delays = [0, 80, 240, 700];
+
+  delays.forEach((delay) => {
+    setTimeout(() => {
+      if (watchId !== state.tutor.visibilityWatchId) return;
+      if (!state.tutor.active || !isTeacherMode() || !teacherPanelEl) return;
+
+      document.body.classList.add('teacher-mode', 'tutor-active');
+      mountTeacherPanelToBody({ force: true });
+      forceTeacherPanelPaint();
+      updateTeacherPanelCollapsedUI();
+      updateTeacherFloatingRescueButton();
+
+      if (isTeacherPanelMobile()) return;
+
+      if (!isTeacherPanelElementVisible()) {
+        const fallback = getDefaultTeacherPanelRect();
+        state.tutor.panelRect = fallback;
+        applyTeacherPanelRect(fallback, { save: false });
+      } else {
+        state.tutor.panelRect = getCurrentTeacherPanelRect();
+      }
+    }, delay);
   });
 }
 
@@ -1031,16 +1156,29 @@ function keepBoardVisibleDuringTeaching() {
 function ensureTeacherPanelVisible() {
   if (!teacherPanelEl || !state.tutor.active || !isTeacherMode()) return;
 
-  teacherPanelEl.hidden = false;
-  teacherPanelEl.style.visibility = 'visible';
-  teacherPanelEl.style.opacity = '1';
+  document.body.classList.add('teacher-mode', 'tutor-active');
+  mountTeacherPanelToBody({ force: true });
+  forceTeacherPanelPaint();
 
-  if (!isTeacherPanelMobile()) {
-    mountTeacherPanelToBody();
-    applyTeacherPanelRect(state.tutor.panelRect || getDefaultTeacherPanelRect(), { save: false });
+  if (isTeacherPanelMobile()) {
+    teacherPanelEl.classList.add('free-teacher-window', 'teacher-panel-safe-visible');
+    teacherPanelEl.style.left = '';
+    teacherPanelEl.style.top = '';
+    teacherPanelEl.style.right = '';
+    teacherPanelEl.style.bottom = '';
+    teacherPanelEl.style.width = '';
+    teacherPanelEl.style.height = '';
+    teacherPanelEl.style.maxHeight = '';
+  } else {
+    const candidate = isTeacherPanelRectVisible(state.tutor.panelRect)
+      ? state.tutor.panelRect
+      : getDefaultTeacherPanelRect();
+    applyTeacherPanelRect(candidate, { save: false });
   }
 
   updateTeacherPanelCollapsedUI();
+  updateTeacherFloatingRescueButton();
+  scheduleTeacherPanelVisibilityCheck();
 }
 
 function startTeacherMode() {
@@ -1075,6 +1213,7 @@ function startTeacherMode() {
   loadTeacherPanelWindow();
   renderTeacherStep();
   ensureTeacherPanelVisible();
+  scheduleTeacherPanelVisibilityCheck();
   setMessage(`電腦教學已開始，共 ${steps.length} 步。按「下一步」開始推理。`);
   setTimeout(keepBoardVisibleDuringTeaching, 60);
 }
@@ -1113,6 +1252,7 @@ function nextTeacherStep() {
 
   renderBoard();
   renderTeacherStep();
+  ensureTeacherPanelVisible();
   setTimeout(keepBoardVisibleDuringTeaching, 60);
 }
 
@@ -1124,6 +1264,7 @@ function previousTeacherStep() {
   state.notes = Array.from({ length: CELLS }, () => new Set());
   renderBoard();
   renderTeacherStep();
+  ensureTeacherPanelVisible();
   setMessage(state.tutor.stepIndex === 0 ? '已回到教學起點。' : `已回到第 ${state.tutor.stepIndex} 步。`);
   setTimeout(keepBoardVisibleDuringTeaching, 60);
 }

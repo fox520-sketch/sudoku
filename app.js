@@ -240,6 +240,7 @@ const state = {
     panelRect: null,
     panelCollapsed: false,
     panelSafeDock: false,
+    mobileTop: null,
     visibilityWatchId: 0,
     panelWatchdogId: null,
     panelMissingCount: 0
@@ -489,6 +490,28 @@ function formatCandidateList(candidates) {
   return candidates.length ? candidates.join('、') : '無候選數';
 }
 
+function escapeHTML(value) {
+  return String(value ?? '')
+    .replaceAll('&', '&amp;')
+    .replaceAll('<', '&lt;')
+    .replaceAll('>', '&gt;')
+    .replaceAll('"', '&quot;')
+    .replaceAll("'", '&#39;');
+}
+
+function compactTeacherReason(step) {
+  if (!step) return '';
+  const coord = cellCoordinate(step.index);
+  const candidates = formatCandidateList(step.candidates || []);
+  if (step.technique === '唯一候選') {
+    return `${coord} 填 ${step.value}。排除同行、同列、同一個 3×3 宮格後，只剩 ${candidates}。`;
+  }
+  if (step.technique === '隱性唯一') {
+    return `${coord} 填 ${step.value}。這個區域裡，${step.value} 只有這一格能放。`;
+  }
+  return `${coord} 填 ${step.value}。先看候選數最少的格子：${candidates}。`;
+}
+
 function makeCandidateSnapshot(board) {
   return Array.from({ length: CELLS }, (_, index) => candidatesFor(board, index));
 }
@@ -669,25 +692,34 @@ function renderTeacherStep() {
   const total = state.tutor.steps.length;
   const currentStepNumber = state.tutor.stepIndex;
   teacherStatusEl.textContent = currentStepNumber >= total
-    ? `教學完成，共 ${total} 步。`
-    : `教學進度：已完成 ${currentStepNumber} / ${total} 步。按「下一步」繼續。`;
+    ? `完成｜共 ${total} 步`
+    : (isTeacherPanelMobile()
+      ? `第 ${currentStepNumber} / ${total} 步`
+      : `教學進度：已完成 ${currentStepNumber} / ${total} 步。按「下一步」繼續。`);
 
   const step = state.tutor.steps[Math.max(0, currentStepNumber - 1)];
   if (!step) {
-    teacherStepEl.innerHTML = '<strong>準備開始：</strong><span>按「下一步」，電腦會先找最容易確定的格子。</span>';
+    teacherStepEl.innerHTML = '<strong>準備開始：</strong><span>按「下一步」，電腦會先找最容易確定的格子。</span><span class="teacher-tip">按下一步後，這裡會出現「完整推理」按鈕。</span>';
     return;
   }
 
+  const summary = compactTeacherReason(step);
   teacherStepEl.innerHTML = `
-    <strong>第 ${step.number} 步｜${step.technique}</strong>
-    <span>${step.title}</span>
-    <span>${step.reason}</span>
-    <span>${step.conclusion}</span>
+    <strong>第 ${escapeHTML(step.number)} 步｜${escapeHTML(step.technique)}</strong>
+    <span class="teacher-summary">${escapeHTML(summary)}</span>
+    <details class="teacher-detail">
+      <summary>完整推理</summary>
+      <span>${escapeHTML(step.title)}</span>
+      <span>${escapeHTML(step.reason)}</span>
+      <span>${escapeHTML(step.conclusion)}</span>
+    </details>
   `;
 }
 
 
+
 const TEACHER_PANEL_STORAGE_KEY = 'oceanSudokuTeacherPanelRectV6';
+const TEACHER_PANEL_MOBILE_TOP_KEY = 'oceanSudokuTeacherMobileTopV1';
 const TEACHER_PANEL_COLLAPSED_KEY = 'oceanSudokuTeacherPanelCollapsedV1';
 const TEACHER_PANEL_MARGIN = 12;
 const TEACHER_PANEL_MIN_WIDTH = 320;
@@ -709,6 +741,61 @@ function finiteOr(value, fallback) {
 
 function isTeacherPanelMobile() {
   return window.matchMedia?.(TEACHER_PANEL_MOBILE_QUERY)?.matches || window.innerWidth <= 860;
+}
+
+function readSavedTeacherMobileTop() {
+  try {
+    const value = Number(localStorage.getItem(TEACHER_PANEL_MOBILE_TOP_KEY));
+    return Number.isFinite(value) ? value : null;
+  } catch (_) {
+    return null;
+  }
+}
+
+function saveTeacherMobileTop(value) {
+  try { localStorage.setItem(TEACHER_PANEL_MOBILE_TOP_KEY, String(Math.round(value))); } catch (_) {}
+}
+
+function clearSavedTeacherMobileTop() {
+  try { localStorage.removeItem(TEACHER_PANEL_MOBILE_TOP_KEY); } catch (_) {}
+}
+
+function normalizeTeacherMobileTop(top) {
+  const fallback = Math.max(8, window.innerHeight - Math.min(300, window.innerHeight * 0.38) - 8);
+  const panelHeight = teacherPanelEl?.getBoundingClientRect?.().height || Math.min(300, window.innerHeight * 0.38);
+  const minTop = Math.max(8, window.visualViewport?.offsetTop || 8);
+  const maxTop = Math.max(minTop, window.innerHeight - Math.min(panelHeight, window.innerHeight - 16) - 8);
+  return clamp(finiteOr(top, fallback), minTop, maxTop);
+}
+
+function applyTeacherPanelMobileTop(top, options = {}) {
+  if (!teacherPanelEl) return null;
+  const normalizedTop = normalizeTeacherMobileTop(top);
+  state.tutor.mobileTop = normalizedTop;
+  teacherPanelEl.classList.add('free-teacher-window', 'teacher-panel-safe-visible', 'teacher-panel-mobile-dragged');
+  teacherPanelEl.style.setProperty('position', 'fixed', 'important');
+  teacherPanelEl.style.setProperty('left', '10px', 'important');
+  teacherPanelEl.style.setProperty('right', 'auto', 'important');
+  teacherPanelEl.style.setProperty('--teacher-mobile-top', `${normalizedTop}px`);
+  teacherPanelEl.style.setProperty('top', `${normalizedTop}px`, 'important');
+  teacherPanelEl.style.setProperty('bottom', 'auto', 'important');
+  teacherPanelEl.style.setProperty('width', 'calc(100vw - 20px)', 'important');
+  teacherPanelEl.style.setProperty('height', 'auto', 'important');
+  teacherPanelEl.style.setProperty('max-height', 'min(38vh, 310px)', 'important');
+  if (options.save !== false) saveTeacherMobileTop(normalizedTop);
+  updateDebugInfo();
+  return normalizedTop;
+}
+
+function updateTeacherPanelCompactLabels() {
+  const mobile = isTeacherPanelMobile();
+  if (teacherDragHandleEl) teacherDragHandleEl.textContent = mobile ? '拖曳面板' : '拖曳移動教學面板';
+  if (teacherPanelResetBtn) teacherPanelResetBtn.textContent = mobile ? '重設' : '重設位置';
+  if (teacherPanelRescueBtn) teacherPanelRescueBtn.textContent = mobile ? '救援' : '救援顯示';
+  if (teacherPanelDockBtn) {
+    if (mobile) teacherPanelDockBtn.textContent = state.tutor.panelSafeDock ? '拖曳' : '固定';
+    else teacherPanelDockBtn.textContent = state.tutor.panelSafeDock ? '拖曳視窗' : '固定底部';
+  }
 }
 
 function readSavedTeacherPanelRect() {
@@ -917,14 +1004,15 @@ function toggleTeacherPanelCollapsed() {
 function updateTeacherPanelSafeDockUI() {
   document.body.classList.toggle('teacher-safe-dock', !!state.tutor.panelSafeDock);
   if (teacherPanelDockBtn) {
-    teacherPanelDockBtn.textContent = state.tutor.panelSafeDock ? '拖曳視窗' : '固定底部';
     teacherPanelDockBtn.setAttribute('aria-pressed', String(!!state.tutor.panelSafeDock));
     teacherPanelDockBtn.title = state.tutor.panelSafeDock
       ? '回到可拖曳、可縮放的教學視窗'
       : '固定到底部安全位置，避免拖曳位移或面板消失';
   }
+  updateTeacherPanelCompactLabels();
   updateDebugInfo();
 }
+
 
 function setTeacherPanelSafeDock(value, options = {}) {
   state.tutor.panelSafeDock = !!value;
@@ -992,14 +1080,9 @@ function loadTeacherPanelWindow() {
   updateTeacherPanelSafeDockUI();
 
   if (isTeacherPanelMobile()) {
-    teacherPanelEl.classList.add('free-teacher-window', 'teacher-panel-safe-visible');
-    teacherPanelEl.style.left = '';
-    teacherPanelEl.style.top = '';
-    teacherPanelEl.style.right = '';
-    teacherPanelEl.style.bottom = '';
-    teacherPanelEl.style.width = '';
-    teacherPanelEl.style.height = '';
-    teacherPanelEl.style.maxHeight = '';
+    const savedTop = readSavedTeacherMobileTop();
+    applyTeacherPanelMobileTop(savedTop, { save: false });
+    updateTeacherPanelCompactLabels();
     scheduleTeacherPanelVisibilityCheck();
     return;
   }
@@ -1016,7 +1099,7 @@ function clearTeacherPanelWindowStyles() {
   document.body.classList.remove('dragging-teacher-panel', 'resizing-teacher-panel', 'teacher-panel-collapsed', 'teacher-safe-dock');
   state.tutor.panelSafeDock = false;
   updateTeacherPanelSafeDockUI();
-  teacherPanelEl.classList.remove('free-teacher-window', 'teacher-panel-safe-visible', 'teacher-panel-collapsed', 'dock-top-left', 'dock-top-right', 'dock-bottom-left', 'dock-bottom-right');
+  teacherPanelEl.classList.remove('free-teacher-window', 'teacher-panel-safe-visible', 'teacher-panel-collapsed', 'teacher-panel-mobile-dragged', 'dock-top-left', 'dock-top-right', 'dock-bottom-left', 'dock-bottom-right');
   teacherPanelEl.style.display = '';
   teacherPanelEl.style.visibility = '';
   teacherPanelEl.style.opacity = '';
@@ -1045,14 +1128,9 @@ function resetTeacherPanelPosition() {
   setTeacherPanelSafeDock(false, { restoreRect: false });
 
   if (isTeacherPanelMobile()) {
-    teacherPanelEl.classList.add('free-teacher-window', 'teacher-panel-safe-visible');
-    teacherPanelEl.style.left = '';
-    teacherPanelEl.style.top = '';
-    teacherPanelEl.style.right = '';
-    teacherPanelEl.style.bottom = '';
-    teacherPanelEl.style.width = '';
-    teacherPanelEl.style.height = '';
-    teacherPanelEl.style.maxHeight = '';
+    clearSavedTeacherMobileTop();
+    applyTeacherPanelMobileTop(null, { save: false });
+    updateTeacherPanelCompactLabels();
   } else {
     applyTeacherPanelRect(getDefaultTeacherPanelRect());
   }
@@ -1070,7 +1148,11 @@ function setupTeacherPanelWindowControls() {
     if (!dragState) return;
     document.body.classList.remove('dragging-teacher-panel');
     try { dragState.target?.releasePointerCapture?.(dragState.pointerId); } catch (_) {}
-    applyTeacherPanelRect(state.tutor.panelRect || getCurrentTeacherPanelRect());
+    if (dragState.mode === 'mobile') {
+      applyTeacherPanelMobileTop(state.tutor.mobileTop, { save: true });
+    } else {
+      applyTeacherPanelRect(state.tutor.panelRect || getCurrentTeacherPanelRect());
+    }
     dragState = null;
     window.removeEventListener('pointermove', moveDrag);
     window.removeEventListener('pointerup', finishDrag);
@@ -1080,6 +1162,11 @@ function setupTeacherPanelWindowControls() {
   const moveDrag = (event) => {
     if (!dragState || event.pointerId !== dragState.pointerId) return;
     event.preventDefault();
+    if (dragState.mode === 'mobile') {
+      const nextTop = event.clientY - dragState.offsetY;
+      if (Number.isFinite(nextTop)) applyTeacherPanelMobileTop(nextTop, { save: false });
+      return;
+    }
     const nextRect = {
       ...dragState.rect,
       x: event.clientX - dragState.offsetX,
@@ -1091,20 +1178,32 @@ function setupTeacherPanelWindowControls() {
   const beginDrag = (event) => {
     if (event.button !== undefined && event.button !== 0) return;
     if (!document.body.classList.contains('tutor-active')) return;
-    if (isTeacherPanelMobile() || state.tutor.panelSafeDock) return;
+    if (state.tutor.panelSafeDock && !isTeacherPanelMobile()) return;
     event.preventDefault();
     const rect = getCurrentTeacherPanelRect();
     mountTeacherPanelToBody({ force: true });
     forceTeacherPanelPaint();
     setTeacherPanelCollapsed(false);
-    applyTeacherPanelRect(rect, { save: false });
-    dragState = {
-      pointerId: event.pointerId,
-      target: event.currentTarget,
-      rect,
-      offsetX: event.clientX - rect.x,
-      offsetY: event.clientY - rect.y
-    };
+    if (isTeacherPanelMobile()) {
+      const mobileTop = Number.isFinite(rect.y) ? rect.y : (teacherPanelEl.getBoundingClientRect().top || 0);
+      applyTeacherPanelMobileTop(mobileTop, { save: false });
+      dragState = {
+        mode: 'mobile',
+        pointerId: event.pointerId,
+        target: event.currentTarget,
+        offsetY: event.clientY - mobileTop
+      };
+    } else {
+      applyTeacherPanelRect(rect, { save: false });
+      dragState = {
+        mode: 'desktop',
+        pointerId: event.pointerId,
+        target: event.currentTarget,
+        rect,
+        offsetX: event.clientX - rect.x,
+        offsetY: event.clientY - rect.y
+      };
+    }
 
     document.body.classList.add('dragging-teacher-panel');
     try { event.currentTarget?.setPointerCapture?.(event.pointerId); } catch (_) {}
@@ -1163,6 +1262,11 @@ function setupTeacherPanelWindowControls() {
   };
 
   teacherDragHandleEl?.addEventListener('pointerdown', beginDrag, { passive: false });
+  teacherWindowBarEl?.addEventListener('pointerdown', (event) => {
+    if (!isTeacherPanelMobile()) return;
+    if (event.target?.closest?.('button')) return;
+    beginDrag(event);
+  }, { passive: false });
   teacherDragHandleEl?.addEventListener('dblclick', resetTeacherPanelPosition);
   teacherResizeHandleEl?.addEventListener('pointerdown', beginResize, { passive: false });
   teacherPanelResetBtn?.addEventListener('click', resetTeacherPanelPosition);
@@ -1171,12 +1275,15 @@ function setupTeacherPanelWindowControls() {
   teacherPanelCollapseBtn?.addEventListener('click', toggleTeacherPanelCollapsed);
 
   window.addEventListener('resize', () => {
-    if (document.body.classList.contains('tutor-active') && !isTeacherPanelMobile()) {
-      applyTeacherPanelRect(state.tutor.panelRect || getCurrentTeacherPanelRect(), { save: false });
+    if (document.body.classList.contains('tutor-active')) {
+      if (isTeacherPanelMobile()) applyTeacherPanelMobileTop(state.tutor.mobileTop ?? readSavedTeacherMobileTop(), { save: false });
+      else applyTeacherPanelRect(state.tutor.panelRect || getCurrentTeacherPanelRect(), { save: false });
     }
+    updateTeacherPanelCompactLabels();
     updateDebugInfo();
   });
 }
+
 
 function scheduleTeacherPanelVisibilityCheck() {
   state.tutor.visibilityWatchId = (state.tutor.visibilityWatchId || 0) + 1;
@@ -1248,14 +1355,8 @@ function ensureTeacherPanelVisible() {
   startTeacherPanelWatchdog();
 
   if (isTeacherPanelMobile()) {
-    teacherPanelEl.classList.add('free-teacher-window', 'teacher-panel-safe-visible');
-    teacherPanelEl.style.left = '';
-    teacherPanelEl.style.top = '';
-    teacherPanelEl.style.right = '';
-    teacherPanelEl.style.bottom = '';
-    teacherPanelEl.style.width = '';
-    teacherPanelEl.style.height = '';
-    teacherPanelEl.style.maxHeight = '';
+    applyTeacherPanelMobileTop(state.tutor.mobileTop ?? readSavedTeacherMobileTop(), { save: false });
+    updateTeacherPanelCompactLabels();
   } else if (!state.tutor.panelSafeDock) {
     const candidate = isTeacherPanelRectVisible(state.tutor.panelRect)
       ? state.tutor.panelRect

@@ -1818,3 +1818,107 @@ body:not(.tutor-active) .teacher-floating-rescue {
     padding-bottom: max(185px, calc(185px + env(safe-area-inset-bottom))) !important;
   }
 }
+
+/* 手機教學面板修正：把可拖曳區做大，並讓完整推理按鈕明顯可見。 */
+.teacher-tip {
+  display: block;
+  color: var(--muted);
+  font-size: .86rem;
+  font-weight: 800;
+}
+
+.teacher-step .teacher-detail summary {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: fit-content;
+  min-height: 32px;
+  padding: 0 12px;
+  border-radius: 999px;
+  border: 1px solid var(--line);
+  background: color-mix(in srgb, var(--button-bg) 88%, white);
+  box-shadow: 0 4px 12px rgba(6, 73, 91, 0.08);
+}
+
+.teacher-step .teacher-detail summary::after {
+  content: "▼";
+  margin-left: 6px;
+  font-size: .72em;
+  opacity: .75;
+}
+
+.teacher-step .teacher-detail[open] summary::after {
+  content: "▲";
+}
+
+@media (max-width: 860px) {
+  body.tutor-active .teacher-window-bar {
+    grid-template-columns: repeat(4, minmax(0, 1fr)) !important;
+    gap: 5px !important;
+    touch-action: none !important;
+  }
+
+  body.tutor-active .teacher-drag-handle {
+    grid-column: 1 / -1 !important;
+    min-height: 36px !important;
+    width: 100% !important;
+    font-size: .86rem !important;
+    letter-spacing: .02em !important;
+    touch-action: none !important;
+    cursor: grab !important;
+  }
+
+  body.dragging-teacher-panel .teacher-drag-handle {
+    cursor: grabbing !important;
+  }
+
+  body.tutor-active .dock-btn {
+    min-height: 30px !important;
+    padding: 0 4px !important;
+    font-size: .72rem !important;
+  }
+
+  body.tutor-active .teacher-status {
+    margin-top: -2px !important;
+    font-size: .78rem !important;
+    line-height: 1.25 !important;
+  }
+
+  body.tutor-active .teacher-step {
+    max-height: 6.8rem !important;
+    padding: 8px !important;
+    gap: 4px !important;
+  }
+
+  body.tutor-active .teacher-step:has(.teacher-detail[open]) {
+    max-height: min(34vh, 260px) !important;
+  }
+
+  body.tutor-active .teacher-step .teacher-summary {
+    font-size: .84rem !important;
+    line-height: 1.36 !important;
+  }
+
+  body.tutor-active .teacher-step .teacher-detail {
+    padding-top: 4px !important;
+  }
+
+  body.tutor-active .teacher-step .teacher-detail summary {
+    min-height: 30px !important;
+    padding: 0 10px !important;
+    font-size: .78rem !important;
+    background: color-mix(in srgb, var(--same) 70%, white) !important;
+    color: var(--ocean-deep) !important;
+  }
+
+  body.tutor-active .teacher-step .teacher-detail[open] span {
+    font-size: .8rem !important;
+    line-height: 1.42 !important;
+  }
+
+  body.tutor-active .teacher-panel.teacher-panel-safe-visible.teacher-panel-mobile-dragged,
+  body.tutor-active > .teacher-panel.teacher-panel-safe-visible.teacher-panel-mobile-dragged {
+    top: var(--teacher-mobile-top, auto) !important;
+    bottom: auto !important;
+  }
+}

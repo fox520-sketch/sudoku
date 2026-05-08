@@ -203,7 +203,12 @@ const teacherStatusEl = $('#teacherStatus');
 const teacherStepEl = $('#teacherStep');
 const teacherBadgeEl = $('#teacherBadge');
 const teacherPanelEl = document.querySelector('.teacher-panel');
+const teacherWindowBarEl = $('#teacherWindowBar');
 const teacherDragHandleEl = $('#teacherDragHandle');
+const teacherResizeHandleEl = $('#teacherResizeHandle');
+const teacherPanelResetBtn = $('#teacherPanelResetBtn');
+const teacherPanelOriginalParent = teacherPanelEl?.parentNode || null;
+const teacherPanelOriginalNextSibling = teacherPanelEl?.nextSibling || null;
 
 const state = {
   puzzle: Array(CELLS).fill(0),
@@ -228,12 +233,7 @@ const state = {
     steps: [],
     stepIndex: 0,
     startedAtCurrent: [],
-    panelDrag: {
-      active: false,
-      pointerId: null,
-      offsetX: 0,
-      offsetY: 0
-    }
+    panelRect: null
   },
   room: {
     configured: false,
@@ -593,7 +593,7 @@ function clearTutorState() {
   state.tutor.steps = [];
   state.tutor.stepIndex = 0;
   state.tutor.startedAtCurrent = [];
-  resetTeacherPanelPosition();
+  clearTeacherPanelWindowStyles();
   updateTeacherControls();
 }
 
@@ -672,121 +672,225 @@ function renderTeacherStep() {
 }
 
 
-function resetTeacherPanelPosition() {
+const TEACHER_PANEL_STORAGE_KEY = 'oceanSudokuTeacherPanelRectV3';
+const TEACHER_PANEL_MARGIN = 10;
+const TEACHER_PANEL_MIN_WIDTH = 300;
+const TEACHER_PANEL_MIN_HEIGHT = 220;
+const TEACHER_PANEL_DEFAULT_WIDTH = 430;
+const TEACHER_PANEL_DEFAULT_HEIGHT = 360;
+
+function clamp(value, min, max) {
+  return Math.min(Math.max(value, min), max);
+}
+
+function readSavedTeacherPanelRect() {
+  try {
+    const raw = localStorage.getItem(TEACHER_PANEL_STORAGE_KEY);
+    if (!raw) return null;
+    const rect = JSON.parse(raw);
+    if (![rect.x, rect.y, rect.width, rect.height].every(Number.isFinite)) return null;
+    return rect;
+  } catch (_) {
+    return null;
+  }
+}
+
+function saveTeacherPanelRect(rect) {
+  try {
+    localStorage.setItem(TEACHER_PANEL_STORAGE_KEY, JSON.stringify(rect));
+  } catch (_) {
+    // 忽略瀏覽器儲存空間限制；面板仍可正常拖曳。
+  }
+}
+
+function mountTeacherPanelToBody() {
+  if (!teacherPanelEl || teacherPanelEl.parentNode === document.body) return;
+  document.body.appendChild(teacherPanelEl);
+  teacherPanelEl.classList.add('teacher-panel-portaled');
+}
+
+function restoreTeacherPanelToOriginalPlace() {
+  if (!teacherPanelEl || !teacherPanelOriginalParent) return;
+  teacherPanelEl.classList.remove('teacher-panel-portaled');
+  if (teacherPanelEl.parentNode === teacherPanelOriginalParent) return;
+  const nextSiblingStillThere = teacherPanelOriginalNextSibling?.parentNode === teacherPanelOriginalParent;
+  teacherPanelOriginalParent.insertBefore(
+    teacherPanelEl,
+    nextSiblingStillThere ? teacherPanelOriginalNextSibling : null
+  );
+}
+
+function getDefaultTeacherPanelRect() {
+  const width = Math.min(TEACHER_PANEL_DEFAULT_WIDTH, window.innerWidth - TEACHER_PANEL_MARGIN * 2);
+  const height = Math.min(TEACHER_PANEL_DEFAULT_HEIGHT, window.innerHeight - TEACHER_PANEL_MARGIN * 2);
+  return {
+    x: Math.max(TEACHER_PANEL_MARGIN, window.innerWidth - width - TEACHER_PANEL_MARGIN),
+    y: Math.max(TEACHER_PANEL_MARGIN, window.innerHeight - height - TEACHER_PANEL_MARGIN),
+    width,
+    height
+  };
+}
+
+function normalizeTeacherPanelRect(rect) {
+  const fallback = getDefaultTeacherPanelRect();
+  const maxWidth = Math.max(TEACHER_PANEL_MIN_WIDTH, window.innerWidth - TEACHER_PANEL_MARGIN * 2);
+  const maxHeight = Math.max(TEACHER_PANEL_MIN_HEIGHT, window.innerHeight - TEACHER_PANEL_MARGIN * 2);
+  const width = clamp(Number(rect?.width) || fallback.width, TEACHER_PANEL_MIN_WIDTH, maxWidth);
+  const height = clamp(Number(rect?.height) || fallback.height, TEACHER_PANEL_MIN_HEIGHT, maxHeight);
+  const x = clamp(Number(rect?.x) || fallback.x, TEACHER_PANEL_MARGIN, Math.max(TEACHER_PANEL_MARGIN, window.innerWidth - width - TEACHER_PANEL_MARGIN));
+  const y = clamp(Number(rect?.y) || fallback.y, TEACHER_PANEL_MARGIN, Math.max(TEACHER_PANEL_MARGIN, window.innerHeight - height - TEACHER_PANEL_MARGIN));
+  return { x, y, width, height };
+}
+
+function applyTeacherPanelRect(rect, options = {}) {
+  if (!teacherPanelEl) return null;
+  const normalized = normalizeTeacherPanelRect(rect);
+  state.tutor.panelRect = normalized;
+
+  teacherPanelEl.classList.remove('dock-top-left', 'dock-top-right', 'dock-bottom-left', 'dock-bottom-right');
+  teacherPanelEl.classList.add('free-teacher-window');
+  teacherPanelEl.style.left = `${normalized.x}px`;
+  teacherPanelEl.style.top = `${normalized.y}px`;
+  teacherPanelEl.style.right = 'auto';
+  teacherPanelEl.style.bottom = 'auto';
+  teacherPanelEl.style.width = `${normalized.width}px`;
+  teacherPanelEl.style.height = `${normalized.height}px`;
+  teacherPanelEl.style.maxHeight = 'none';
+
+  if (options.save !== false) saveTeacherPanelRect(normalized);
+  return normalized;
+}
+
+function getCurrentTeacherPanelRect() {
+  if (!teacherPanelEl) return getDefaultTeacherPanelRect();
+  const rect = teacherPanelEl.getBoundingClientRect();
+  return normalizeTeacherPanelRect({
+    x: rect.left,
+    y: rect.top,
+    width: rect.width,
+    height: rect.height
+  });
+}
+
+function loadTeacherPanelWindow() {
+  mountTeacherPanelToBody();
+  const saved = readSavedTeacherPanelRect();
+  applyTeacherPanelRect(saved || getDefaultTeacherPanelRect(), { save: false });
+}
+
+
+function clearTeacherPanelWindowStyles() {
   if (!teacherPanelEl) return;
-  const drag = state.tutor.panelDrag;
-  drag.active = false;
-  drag.pointerId = null;
-  drag.offsetX = 0;
-  drag.offsetY = 0;
-  teacherPanelEl.classList.remove('dragging', 'user-positioned');
-  document.body.classList.remove('dragging-teacher-panel');
+  document.body.classList.remove('dragging-teacher-panel', 'resizing-teacher-panel');
+  teacherPanelEl.classList.remove('free-teacher-window', 'dock-top-left', 'dock-top-right', 'dock-bottom-left', 'dock-bottom-right');
   teacherPanelEl.style.left = '';
   teacherPanelEl.style.top = '';
   teacherPanelEl.style.right = '';
   teacherPanelEl.style.bottom = '';
+  teacherPanelEl.style.width = '';
+  teacherPanelEl.style.height = '';
+  teacherPanelEl.style.maxHeight = '';
+  restoreTeacherPanelToOriginalPlace();
 }
 
-function clampNumber(value, min, max) {
-  return Math.min(Math.max(value, min), max);
-}
-
-function getTeacherPanelBounds() {
-  const rect = teacherPanelEl.getBoundingClientRect();
-  const margin = 8;
-  const maxLeft = Math.max(margin, window.innerWidth - rect.width - margin);
-  const maxTop = Math.max(margin, window.innerHeight - rect.height - margin);
-  return { rect, margin, maxLeft, maxTop };
-}
-
-function moveTeacherPanelTo(left, top) {
+function resetTeacherPanelPosition() {
   if (!teacherPanelEl) return;
-  const { margin, maxLeft, maxTop } = getTeacherPanelBounds();
-  const nextLeft = clampNumber(left, margin, maxLeft);
-  const nextTop = clampNumber(top, margin, maxTop);
-
-  // 拖曳後只使用 left/top 定位，避免和 CSS 原本的 right/bottom 混用造成游標偏移或面板跳走。
-  teacherPanelEl.style.left = `${Math.round(nextLeft)}px`;
-  teacherPanelEl.style.top = `${Math.round(nextTop)}px`;
-  teacherPanelEl.style.right = 'auto';
-  teacherPanelEl.style.bottom = 'auto';
-  teacherPanelEl.classList.add('user-positioned');
+  mountTeacherPanelToBody();
+  document.body.classList.remove('dragging-teacher-panel', 'resizing-teacher-panel');
+  applyTeacherPanelRect(getDefaultTeacherPanelRect());
 }
 
-function keepTeacherPanelInsideViewport() {
-  if (!teacherPanelEl || !teacherPanelEl.classList.contains('user-positioned')) return;
-  const rect = teacherPanelEl.getBoundingClientRect();
-  moveTeacherPanelTo(rect.left, rect.top);
-}
+function setupTeacherPanelWindowControls() {
+  if (!teacherPanelEl) return;
 
-function isTeacherPanelFloating() {
-  return document.body.classList.contains('tutor-active') && teacherPanelEl;
-}
-
-function setupTeacherPanelDrag() {
-  if (!teacherPanelEl || !teacherDragHandleEl) return;
-
-  teacherDragHandleEl.addEventListener('pointerdown', (event) => {
-    if (!isTeacherPanelFloating()) return;
+  const beginDrag = (event) => {
+    if (event.button !== undefined && event.button !== 0) return;
+    if (!document.body.classList.contains('tutor-active')) return;
     event.preventDefault();
+    mountTeacherPanelToBody();
 
-    const rect = teacherPanelEl.getBoundingClientRect();
+    const start = getCurrentTeacherPanelRect();
+    applyTeacherPanelRect(start, { save: false });
+    const pointerStartX = event.clientX;
+    const pointerStartY = event.clientY;
 
-    state.tutor.panelDrag = {
-      active: true,
-      pointerId: event.pointerId,
-      offsetX: event.clientX - rect.left,
-      offsetY: event.clientY - rect.top
+    document.body.classList.add('dragging-teacher-panel');
+    teacherDragHandleEl?.setPointerCapture?.(event.pointerId);
+
+    const move = (moveEvent) => {
+      moveEvent.preventDefault();
+      const nextRect = {
+        ...start,
+        x: start.x + (moveEvent.clientX - pointerStartX),
+        y: start.y + (moveEvent.clientY - pointerStartY)
+      };
+      applyTeacherPanelRect(nextRect, { save: false });
     };
 
-    // 先把目前 CSS 計算出來的位置固定成 left/top，滑鼠才會一直對準原本抓住的位置。
-    teacherPanelEl.style.left = `${Math.round(rect.left)}px`;
-    teacherPanelEl.style.top = `${Math.round(rect.top)}px`;
-    teacherPanelEl.style.right = 'auto';
-    teacherPanelEl.style.bottom = 'auto';
-    teacherPanelEl.classList.add('dragging', 'user-positioned');
-    document.body.classList.add('dragging-teacher-panel');
+    const end = (endEvent) => {
+      document.body.classList.remove('dragging-teacher-panel');
+      teacherDragHandleEl?.releasePointerCapture?.(endEvent.pointerId);
+      applyTeacherPanelRect(getCurrentTeacherPanelRect());
+      window.removeEventListener('pointermove', move);
+      window.removeEventListener('pointerup', end);
+      window.removeEventListener('pointercancel', end);
+    };
 
-    try {
-      teacherDragHandleEl.setPointerCapture?.(event.pointerId);
-    } catch (error) {
-      // 某些瀏覽器在特殊情況下可能不能 capture，忽略即可，仍可用 window pointermove。
-    }
-  }, { passive: false });
-
-  window.addEventListener('pointermove', (event) => {
-    const drag = state.tutor.panelDrag;
-    if (!drag.active) return;
-    if (drag.pointerId !== null && event.pointerId !== undefined && event.pointerId !== drag.pointerId) return;
-    event.preventDefault();
-
-    moveTeacherPanelTo(
-      event.clientX - drag.offsetX,
-      event.clientY - drag.offsetY
-    );
-  }, { passive: false });
-
-  const endDrag = (event) => {
-    const drag = state.tutor.panelDrag;
-    if (!drag.active) return;
-    if (drag.pointerId !== null && event?.pointerId !== undefined && event.pointerId !== drag.pointerId) return;
-
-    drag.active = false;
-    document.body.classList.remove('dragging-teacher-panel');
-    teacherPanelEl.classList.remove('dragging');
-    keepTeacherPanelInsideViewport();
-
-    try {
-      if (event?.pointerId !== undefined) teacherDragHandleEl.releasePointerCapture?.(event.pointerId);
-    } catch (error) {
-      // pointer capture 可能已被瀏覽器釋放。
-    }
+    window.addEventListener('pointermove', move, { passive: false });
+    window.addEventListener('pointerup', end, { once: true });
+    window.addEventListener('pointercancel', end, { once: true });
   };
 
-  window.addEventListener('pointerup', endDrag);
-  window.addEventListener('pointercancel', endDrag);
-  window.addEventListener('blur', endDrag);
-  window.addEventListener('resize', keepTeacherPanelInsideViewport);
+  const beginResize = (event) => {
+    if (event.button !== undefined && event.button !== 0) return;
+    if (!document.body.classList.contains('tutor-active')) return;
+    event.preventDefault();
+    mountTeacherPanelToBody();
+
+    const start = getCurrentTeacherPanelRect();
+    applyTeacherPanelRect(start, { save: false });
+    const pointerStartX = event.clientX;
+    const pointerStartY = event.clientY;
+
+    document.body.classList.add('resizing-teacher-panel');
+    teacherResizeHandleEl?.setPointerCapture?.(event.pointerId);
+
+    const move = (moveEvent) => {
+      moveEvent.preventDefault();
+      const maxWidth = window.innerWidth - start.x - TEACHER_PANEL_MARGIN;
+      const maxHeight = window.innerHeight - start.y - TEACHER_PANEL_MARGIN;
+      const nextRect = {
+        ...start,
+        width: clamp(start.width + (moveEvent.clientX - pointerStartX), TEACHER_PANEL_MIN_WIDTH, Math.max(TEACHER_PANEL_MIN_WIDTH, maxWidth)),
+        height: clamp(start.height + (moveEvent.clientY - pointerStartY), TEACHER_PANEL_MIN_HEIGHT, Math.max(TEACHER_PANEL_MIN_HEIGHT, maxHeight))
+      };
+      applyTeacherPanelRect(nextRect, { save: false });
+    };
+
+    const end = (endEvent) => {
+      document.body.classList.remove('resizing-teacher-panel');
+      teacherResizeHandleEl?.releasePointerCapture?.(endEvent.pointerId);
+      applyTeacherPanelRect(getCurrentTeacherPanelRect());
+      window.removeEventListener('pointermove', move);
+      window.removeEventListener('pointerup', end);
+      window.removeEventListener('pointercancel', end);
+    };
+
+    window.addEventListener('pointermove', move, { passive: false });
+    window.addEventListener('pointerup', end, { once: true });
+    window.addEventListener('pointercancel', end, { once: true });
+  };
+
+  teacherDragHandleEl?.addEventListener('pointerdown', beginDrag, { passive: false });
+  teacherResizeHandleEl?.addEventListener('pointerdown', beginResize, { passive: false });
+  teacherPanelResetBtn?.addEventListener('click', resetTeacherPanelPosition);
+
+  window.addEventListener('resize', () => {
+    if (document.body.classList.contains('tutor-active')) {
+      applyTeacherPanelRect(state.tutor.panelRect || getCurrentTeacherPanelRect(), { save: false });
+    }
+  });
+
 }
 
 function keepBoardVisibleDuringTeaching() {
@@ -832,6 +936,7 @@ function startTeacherMode() {
 
   renderBoard();
   renderTeacherStep();
+  loadTeacherPanelWindow();
   setMessage(`電腦教學已開始，共 ${steps.length} 步。按「下一步」開始推理。`);
   setTimeout(keepBoardVisibleDuringTeaching, 60);
 }
@@ -1868,7 +1973,7 @@ function init() {
   difficultyEl.value = getDifficultyFromUrl();
   buildBoard();
   buildPad();
-  setupTeacherPanelDrag();
+  setupTeacherPanelWindowControls();
   setupPlayerName();
   bindEvents();
   setupFirebase();

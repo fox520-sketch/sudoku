@@ -65,7 +65,10 @@
             </div>
             <span id="teacherBadge" class="teacher-badge">未開始</span>
           </div>
-          <div id="teacherDragHandle" class="teacher-drag-handle" role="button" tabindex="0" aria-label="拖曳移動電腦教學面板">拖曳移動教學面板</div>
+          <div id="teacherWindowBar" class="teacher-window-bar" aria-label="移動與縮放電腦教學面板">
+            <div id="teacherDragHandle" class="teacher-drag-handle" role="button" tabindex="0" aria-label="拖曳移動教學面板">拖曳移動教學面板</div>
+            <button id="teacherPanelResetBtn" class="dock-btn" type="button">重設位置</button>
+          </div>
           <p id="teacherStatus" class="teacher-status">選好題目後，按「開始教學」，電腦會從原題開始，一步一步示範如何思考。</p>
           <div class="teacher-actions">
             <button id="teacherStartBtn" class="tool" type="button">開始教學</button>
@@ -77,6 +80,7 @@
             <strong>教學模式會說明：</strong>
             <span>候選數、唯一候選、隱性唯一，以及必要時的進階推理示範。</span>
           </article>
+          <div id="teacherResizeHandle" class="teacher-resize-handle" aria-label="拖曳縮放教學面板" title="拖曳縮放教學面板"></div>
         </section>
 
       </section>

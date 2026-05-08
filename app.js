@@ -238,7 +238,9 @@ const state = {
     startedAtCurrent: [],
     panelRect: null,
     panelCollapsed: false,
-    visibilityWatchId: 0
+    visibilityWatchId: 0,
+    panelWatchdogId: null,
+    panelMissingCount: 0
   },
   room: {
     configured: false,
@@ -594,6 +596,7 @@ function generateTutorialSteps(puzzle, solution) {
 }
 
 function clearTutorState() {
+  stopTeacherPanelWatchdog();
   state.tutor.active = false;
   state.tutor.steps = [];
   state.tutor.stepIndex = 0;
@@ -682,13 +685,14 @@ function renderTeacherStep() {
 }
 
 
-const TEACHER_PANEL_STORAGE_KEY = 'oceanSudokuTeacherPanelRectV4';
+const TEACHER_PANEL_STORAGE_KEY = 'oceanSudokuTeacherPanelRectV5';
 const TEACHER_PANEL_COLLAPSED_KEY = 'oceanSudokuTeacherPanelCollapsedV1';
 const TEACHER_PANEL_MARGIN = 12;
 const TEACHER_PANEL_MIN_WIDTH = 320;
 const TEACHER_PANEL_MIN_HEIGHT = 230;
 const TEACHER_PANEL_DEFAULT_WIDTH = 440;
 const TEACHER_PANEL_DEFAULT_HEIGHT = 370;
+const TEACHER_PANEL_WATCHDOG_INTERVAL = 900;
 const TEACHER_PANEL_SAFE_Z_INDEX = 2147483000;
 const TEACHER_PANEL_MOBILE_QUERY = '(max-width: 860px)';
 
@@ -811,7 +815,8 @@ function isTeacherPanelElementVisible() {
   if (rect.width <= 0 || rect.height <= 0) return false;
   const visibleWidth = Math.min(window.innerWidth, rect.right) - Math.max(0, rect.left);
   const visibleHeight = Math.min(window.innerHeight, rect.bottom) - Math.max(0, rect.top);
-  return visibleWidth >= 100 && visibleHeight >= 80;
+  const minVisibleHeight = state.tutor.panelCollapsed ? 32 : 80;
+  return visibleWidth >= 100 && visibleHeight >= minVisibleHeight;
 }
 
 function forceTeacherPanelPaint() {
@@ -858,6 +863,43 @@ function updateTeacherPanelCollapsedUI() {
     teacherPanelCollapseBtn.setAttribute('aria-pressed', String(!!state.tutor.panelCollapsed));
   }
   updateDebugInfo();
+}
+
+function stopTeacherPanelWatchdog() {
+  if (state.tutor.panelWatchdogId) {
+    clearInterval(state.tutor.panelWatchdogId);
+    state.tutor.panelWatchdogId = null;
+  }
+  state.tutor.panelMissingCount = 0;
+}
+
+function startTeacherPanelWatchdog() {
+  if (state.tutor.panelWatchdogId || !teacherPanelEl) return;
+  state.tutor.panelWatchdogId = window.setInterval(() => {
+    if (!state.tutor.active || !isTeacherMode()) {
+      stopTeacherPanelWatchdog();
+      return;
+    }
+    if (document.body.classList.contains('dragging-teacher-panel') || document.body.classList.contains('resizing-teacher-panel')) {
+      return;
+    }
+
+    document.body.classList.add('teacher-mode', 'tutor-active');
+    mountTeacherPanelToBody({ force: true });
+    forceTeacherPanelPaint();
+    updateTeacherFloatingRescueButton();
+
+    if (isTeacherPanelMobile()) return;
+
+    if (!isTeacherPanelElementVisible()) {
+      state.tutor.panelMissingCount += 1;
+      const fallback = state.tutor.panelMissingCount >= 2 ? getDefaultTeacherPanelRect() : (state.tutor.panelRect || getDefaultTeacherPanelRect());
+      applyTeacherPanelRect(fallback, { save: false });
+    } else {
+      state.tutor.panelMissingCount = 0;
+      state.tutor.panelRect = getCurrentTeacherPanelRect();
+    }
+  }, TEACHER_PANEL_WATCHDOG_INTERVAL);
 }
 
 function setTeacherPanelCollapsed(value, options = {}) {
@@ -907,6 +949,7 @@ function loadTeacherPanelWindow() {
   if (!teacherPanelEl) return;
   mountTeacherPanelToBody({ force: true });
   forceTeacherPanelPaint();
+  startTeacherPanelWatchdog();
 
   // 按下「開始教學」時一律先展開，避免沿用先前收合狀態時誤以為面板不見。
   setTeacherPanelCollapsed(false, { save: false });
@@ -931,6 +974,7 @@ function loadTeacherPanelWindow() {
 }
 
 function clearTeacherPanelWindowStyles() {
+  stopTeacherPanelWatchdog();
   if (!teacherPanelEl) return;
   document.body.classList.remove('dragging-teacher-panel', 'resizing-teacher-panel', 'teacher-panel-collapsed');
   teacherPanelEl.classList.remove('free-teacher-window', 'teacher-panel-safe-visible', 'teacher-panel-collapsed', 'dock-top-left', 'dock-top-right', 'dock-bottom-left', 'dock-bottom-right');
@@ -1079,6 +1123,7 @@ function setupTeacherPanelWindowControls() {
   };
 
   teacherDragHandleEl?.addEventListener('pointerdown', beginDrag, { passive: false });
+  teacherDragHandleEl?.addEventListener('dblclick', resetTeacherPanelPosition);
   teacherResizeHandleEl?.addEventListener('pointerdown', beginResize, { passive: false });
   teacherPanelResetBtn?.addEventListener('click', resetTeacherPanelPosition);
   teacherPanelRescueBtn?.addEventListener('click', resetTeacherPanelPosition);
@@ -1159,6 +1204,7 @@ function ensureTeacherPanelVisible() {
   document.body.classList.add('teacher-mode', 'tutor-active');
   mountTeacherPanelToBody({ force: true });
   forceTeacherPanelPaint();
+  startTeacherPanelWatchdog();
 
   if (isTeacherPanelMobile()) {
     teacherPanelEl.classList.add('free-teacher-window', 'teacher-panel-safe-visible');

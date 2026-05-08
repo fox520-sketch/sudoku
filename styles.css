@@ -1378,7 +1378,7 @@ body.teacher-mode:not(.tutor-active) .teacher-panel {
 /* 教學面板：桌面拖曳 + 縮放，手機底部抽屜 */
 .teacher-window-bar {
   display: none;
-  grid-template-columns: minmax(0, 1fr) auto auto;
+  grid-template-columns: minmax(0, 1fr) auto auto auto;
   align-items: center;
   gap: 8px;
   border-radius: 18px;
@@ -1456,6 +1456,9 @@ body.tutor-active .teacher-panel.free-teacher-window {
   overflow: auto;
   resize: none;
   z-index: 1000;
+  overscroll-behavior: contain;
+  will-change: left, top, width, height;
+  contain: layout paint;
   margin: 0;
   padding-bottom: 38px;
   background: color-mix(in srgb, var(--card) 90%, white);
@@ -1463,6 +1466,17 @@ body.tutor-active .teacher-panel.free-teacher-window {
   border: 1px solid var(--line);
 }
 
+body.tutor-active .teacher-panel.free-teacher-window .teacher-window-bar {
+  cursor: default;
+}
+
+body.tutor-active .teacher-panel.free-teacher-window .teacher-drag-handle {
+  min-width: 0;
+}
+
+body.tutor-active .teacher-panel.free-teacher-window .dock-btn {
+  white-space: nowrap;
+}
 
 body.tutor-active > .teacher-panel.teacher-panel-portaled {
   position: fixed;

@@ -5,11 +5,119 @@ const DIGITS = [1, 2, 3, 4, 5, 6, 7, 8, 9];
 const ROOM_PREFIX = 'OCEAN-';
 const ROOM_CHARS = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
 
-const DIFFICULTIES = {
-  easy: { label: '簡單', givens: 45 },
-  medium: { label: '中等', givens: 38 },
-  hard: { label: '困難', givens: 32 },
-  expert: { label: '專家', givens: 28 }
+const LEGACY_DIFFICULTY_MAP = { easy: '4', medium: '8', hard: '14', expert: '18' };
+
+function normalizeDifficultyKey(value) {
+  const raw = String(value ?? '').trim();
+  if (DIFFICULTIES[raw]) return raw;
+  if (LEGACY_DIFFICULTY_MAP[raw]) return LEGACY_DIFFICULTY_MAP[raw];
+  const digits = raw.replace(/[^\d]/g, '');
+  return DIFFICULTIES[digits] ? digits : '8';
+}
+
+function populateDifficultyOptions() {
+  difficultyEl.innerHTML = '';
+  Object.entries(DIFFICULTIES).forEach(([key, info]) => {
+    const option = document.createElement('option');
+    option.value = key;
+    option.textContent = `${String(info.level).padStart(2, '0')}｜${info.name}`;
+    difficultyEl.appendChild(option);
+  });
+}
+
+function normalizeThemeKey(value) {
+  const key = String(value || '').trim();
+  return THEMES[key] ? key : 'ocean';
+}
+
+function populateThemeOptions() {
+  themeEl.innerHTML = '';
+  Object.entries(THEMES).forEach(([key, info]) => {
+    const option = document.createElement('option');
+    option.value = key;
+    option.textContent = info.label;
+    themeEl.appendChild(option);
+  });
+}
+
+function getSavedTheme() {
+  return normalizeThemeKey(localStorage.getItem('oceanSudokuTheme'));
+}
+
+function saveTheme(themeKey) {
+  localStorage.setItem('oceanSudokuTheme', themeKey);
+}
+
+function updateThemeColor(themeKey) {
+  const meta = document.querySelector('meta[name="theme-color"]');
+  const color = THEMES[themeKey]?.themeColor || THEMES.ocean.themeColor;
+  if (meta) meta.setAttribute('content', color);
+}
+
+function applyTheme(themeKey, options = {}) {
+  const key = normalizeThemeKey(themeKey);
+  state.theme = key;
+  document.body.dataset.theme = key;
+  if (themeEl) themeEl.value = key;
+  saveTheme(key);
+  updateThemeColor(key);
+  if (options.updateUrl) updateThemeInBrowserUrl();
+}
+
+function getDifficultyInfo(key = difficultyEl.value) {
+  return DIFFICULTIES[normalizeDifficultyKey(key)] || DIFFICULTIES['8'];
+}
+
+const DIFFICULTY_NAMES = {
+  1: '最簡單',
+  2: '很簡單',
+  3: '簡單+',
+  4: '輕鬆',
+  5: '初階',
+  6: '初中階',
+  7: '中下',
+  8: '中階',
+  9: '中階+',
+  10: '進階入門',
+  11: '進階',
+  12: '進階+',
+  13: '挑戰',
+  14: '困難',
+  15: '困難+',
+  16: '高難度',
+  17: '專家',
+  18: '專家+',
+  19: '大師',
+  20: '最難'
+};
+
+const DIFFICULTIES = (() => {
+  const givensByLevel = {
+    1: 50, 2: 49, 3: 47, 4: 45, 5: 43,
+    6: 41, 7: 39, 8: 37, 9: 35, 10: 34,
+    11: 33, 12: 32, 13: 31, 14: 30, 15: 29,
+    16: 28, 17: 27, 18: 26, 19: 25, 20: 24
+  };
+  return Object.fromEntries(Object.entries(givensByLevel).map(([level, givens]) => {
+    const key = String(level);
+    const name = DIFFICULTY_NAMES[level] || '挑戰';
+    return [key, {
+      level: Number(level),
+      givens,
+      name,
+      label: `${level} 級`,
+      display: `${level} 級｜${name}`
+    }];
+  }));
+})();
+
+const THEMES = {
+  ocean: { label: '海洋風', themeColor: '#0f7f9a' },
+  eyeCare: { label: '護眼風', themeColor: '#778a45' },
+  epaper: { label: '電子紙', themeColor: '#666666' },
+  dusk: { label: '暮光風', themeColor: '#5d58ca' },
+  sakura: { label: '櫻花風', themeColor: '#cf7f9e' },
+  forest: { label: '森林風', themeColor: '#3f7a55' }
 };
 
 const $ = (selector) => document.querySelector(selector);
@@ -20,6 +128,7 @@ const timerEl = $('#timer');
 const mistakesEl = $('#mistakes');
 const hintsEl = $('#hints');
 const difficultyEl = $('#difficulty');
+const themeEl = $('#theme');
 const loadingEl = $('#loading');
 const newGameBtn = $('#newGameBtn');
 const shareBtn = $('#shareBtn');
@@ -38,6 +147,13 @@ const leaveRoomBtn = $('#leaveRoomBtn');
 const roomStatusEl = $('#roomStatus');
 const playerListEl = $('#playerList');
 const roomBadgeEl = $('#roomBadge');
+const teacherStartBtn = $('#teacherStartBtn');
+const teacherPrevBtn = $('#teacherPrevBtn');
+const teacherNextBtn = $('#teacherNextBtn');
+const teacherResetBtn = $('#teacherResetBtn');
+const teacherStatusEl = $('#teacherStatus');
+const teacherStepEl = $('#teacherStep');
+const teacherBadgeEl = $('#teacherBadge');
 
 const state = {
   puzzle: Array(CELLS).fill(0),
@@ -55,6 +171,13 @@ const state = {
   timerId: null,
   locked: false,
   busy: false,
+  theme: 'ocean',
+  tutor: {
+    active: false,
+    steps: [],
+    stepIndex: 0,
+    startedAtCurrent: []
+  },
   room: {
     configured: false,
     db: null,
@@ -257,6 +380,311 @@ function createPuzzle(difficultyKey, seed) {
 
   return bestPuzzle;
 }
+
+
+function cellLabel(index) {
+  return `第 ${rowOf(index) + 1} 列第 ${colOf(index) + 1} 行`;
+}
+
+function unitName(type, unitIndex) {
+  if (type === 'row') return `第 ${unitIndex + 1} 列`;
+  if (type === 'col') return `第 ${unitIndex + 1} 行`;
+  return `第 ${unitIndex + 1} 宮`;
+}
+
+function unitCells(type, unitIndex) {
+  if (type === 'row') return DIGITS.map((_, c) => unitIndex * BOARD_SIZE + c);
+  if (type === 'col') return DIGITS.map((_, r) => r * BOARD_SIZE + unitIndex);
+
+  const startRow = Math.floor(unitIndex / BOX_SIZE) * BOX_SIZE;
+  const startCol = (unitIndex % BOX_SIZE) * BOX_SIZE;
+  const cells = [];
+  for (let r = startRow; r < startRow + BOX_SIZE; r++) {
+    for (let c = startCol; c < startCol + BOX_SIZE; c++) {
+      cells.push(r * BOARD_SIZE + c);
+    }
+  }
+  return cells;
+}
+
+function presentNumbersInUnit(board, cells) {
+  return [...new Set(cells.map((index) => board[index]).filter(Boolean))].sort((a, b) => a - b);
+}
+
+function formatNumbers(numbers) {
+  return numbers.length ? numbers.join('、') : '沒有已知數字';
+}
+
+function formatCandidateList(candidates) {
+  return candidates.length ? candidates.join('、') : '無候選數';
+}
+
+function makeCandidateSnapshot(board) {
+  return Array.from({ length: CELLS }, (_, index) => candidatesFor(board, index));
+}
+
+function getEliminationReason(board, index, candidates) {
+  const rowCells = unitCells('row', rowOf(index));
+  const colCells = unitCells('col', colOf(index));
+  const boxCells = unitCells('box', boxOf(index));
+  return `觀察 ${cellLabel(index)}：同列已有 ${formatNumbers(presentNumbersInUnit(board, rowCells))}；同行已有 ${formatNumbers(presentNumbersInUnit(board, colCells))}；同宮已有 ${formatNumbers(presentNumbersInUnit(board, boxCells))}。排除後，候選數只剩 ${formatCandidateList(candidates)}。`;
+}
+
+function findNakedSingleStep(board, solution, candidateSnapshot) {
+  for (let index = 0; index < CELLS; index++) {
+    if (board[index] !== 0) continue;
+    const candidates = candidateSnapshot[index];
+    if (candidates.length === 1) {
+      const value = candidates[0];
+      return {
+        technique: '唯一候選',
+        index,
+        value,
+        candidates,
+        title: `${cellLabel(index)} 只剩一個可能數字`,
+        reason: getEliminationReason(board, index, candidates),
+        conclusion: `所以這格必須填 ${value}。`
+      };
+    }
+  }
+  return null;
+}
+
+function findHiddenSingleStep(board, solution, candidateSnapshot) {
+  const unitTypes = ['row', 'col', 'box'];
+  for (const type of unitTypes) {
+    for (let unitIndex = 0; unitIndex < BOARD_SIZE; unitIndex++) {
+      const cells = unitCells(type, unitIndex);
+      for (const digit of DIGITS) {
+        if (cells.some((index) => board[index] === digit)) continue;
+        const places = cells.filter((index) => board[index] === 0 && candidateSnapshot[index].includes(digit));
+        if (places.length === 1) {
+          const index = places[0];
+          return {
+            technique: '隱性唯一',
+            index,
+            value: digit,
+            candidates: candidateSnapshot[index],
+            title: `${unitName(type, unitIndex)} 的 ${digit} 只有一個位置可放`,
+            reason: `${unitName(type, unitIndex)} 還缺數字 ${digit}。檢查這個區域的空格後，只有 ${cellLabel(index)} 的候選數包含 ${digit}，其他空格都不能放 ${digit}。`,
+            conclusion: `所以 ${cellLabel(index)} 要填 ${digit}。`
+          };
+        }
+      }
+    }
+  }
+  return null;
+}
+
+function findAdvancedStep(board, solution, candidateSnapshot) {
+  let bestIndex = -1;
+  let bestCandidates = null;
+  for (let index = 0; index < CELLS; index++) {
+    if (board[index] !== 0) continue;
+    const candidates = candidateSnapshot[index];
+    if (!bestCandidates || candidates.length < bestCandidates.length) {
+      bestIndex = index;
+      bestCandidates = candidates;
+    }
+  }
+
+  if (bestIndex < 0) return null;
+  const value = solution[bestIndex];
+  return {
+    technique: '進階推理示範',
+    index: bestIndex,
+    value,
+    candidates: bestCandidates || [],
+    title: `${cellLabel(bestIndex)} 需要進階判斷`,
+    reason: `目前用「唯一候選」與「隱性唯一」暫時推不動。電腦改用候選數最少的格子來示範進階思路：${cellLabel(bestIndex)} 的候選數是 ${formatCandidateList(bestCandidates || [])}。`,
+    conclusion: `沿著正確分支推演，這格最後可確定為 ${value}。實際練習時，可以把這一步當成較高階技巧或假設推理的示範。`
+  };
+}
+
+function generateTutorialSteps(puzzle, solution) {
+  const board = [...puzzle];
+  const steps = [];
+  const maxSteps = CELLS;
+
+  for (let guard = 0; guard < maxSteps; guard++) {
+    if (board.every((value, index) => value === solution[index])) break;
+
+    const candidateSnapshot = makeCandidateSnapshot(board);
+    let step =
+      findNakedSingleStep(board, solution, candidateSnapshot) ||
+      findHiddenSingleStep(board, solution, candidateSnapshot) ||
+      findAdvancedStep(board, solution, candidateSnapshot);
+
+    if (!step || !Number.isInteger(step.index)) break;
+
+    step.number = steps.length + 1;
+    step.boardBefore = boardToString(board);
+    board[step.index] = step.value;
+    step.boardAfter = boardToString(board);
+    steps.push(step);
+  }
+
+  return steps;
+}
+
+function clearTutorState() {
+  state.tutor.active = false;
+  state.tutor.steps = [];
+  state.tutor.stepIndex = 0;
+  state.tutor.startedAtCurrent = [];
+  updateTeacherControls();
+}
+
+function restoreBoardFromTutorStart() {
+  if (state.tutor.startedAtCurrent?.length === CELLS) {
+    state.current = [...state.tutor.startedAtCurrent];
+    state.locked = state.current.every((value, index) => value === state.solution[index]);
+    state.notes = Array.from({ length: CELLS }, () => new Set());
+    state.selected = state.current.findIndex((value, index) => !state.fixed[index] && value === 0);
+    if (state.selected < 0) state.selected = 0;
+    renderBoard();
+  }
+}
+
+function updateTeacherControls() {
+  if (!teacherStartBtn) return;
+
+  const active = state.tutor.active;
+  const total = state.tutor.steps.length;
+  const stepIndex = state.tutor.stepIndex;
+  const roomMode = isInRoom();
+
+  teacherStartBtn.disabled = state.busy || roomMode;
+  teacherPrevBtn.disabled = state.busy || !active || stepIndex <= 0;
+  teacherNextBtn.disabled = state.busy || !active || stepIndex >= total;
+  teacherResetBtn.disabled = state.busy || !active;
+
+  if (teacherBadgeEl) {
+    if (roomMode) teacherBadgeEl.textContent = '單人可用';
+    else if (active) teacherBadgeEl.textContent = `${stepIndex}/${total}`;
+    else teacherBadgeEl.textContent = '未開始';
+  }
+
+  if (roomMode && !active && teacherStatusEl) {
+    teacherStatusEl.textContent = '多人房間中暫停教學功能，請先離開房間再使用，避免覆蓋大家的同步進度。';
+  }
+}
+
+function renderTeacherStep() {
+  if (!teacherStepEl || !teacherStatusEl) return;
+  updateTeacherControls();
+
+  if (!state.tutor.active) {
+    teacherStatusEl.textContent = '選好題目後，按「開始教學」，電腦會從原題開始，一步一步示範如何思考。';
+    teacherStepEl.innerHTML = '<strong>教學模式會說明：</strong><span>候選數、唯一候選、隱性唯一，以及必要時的進階推理示範。</span>';
+    return;
+  }
+
+  const total = state.tutor.steps.length;
+  const currentStepNumber = state.tutor.stepIndex;
+  teacherStatusEl.textContent = currentStepNumber >= total
+    ? `教學完成，共 ${total} 步。`
+    : `教學進度：已完成 ${currentStepNumber} / ${total} 步。按「下一步」繼續。`;
+
+  const step = state.tutor.steps[Math.max(0, currentStepNumber - 1)];
+  if (!step) {
+    teacherStepEl.innerHTML = '<strong>準備開始：</strong><span>按「下一步」，電腦會先找最容易確定的格子。</span>';
+    return;
+  }
+
+  teacherStepEl.innerHTML = `
+    <strong>第 ${step.number} 步｜${step.technique}</strong>
+    <span>${step.title}</span>
+    <span>${step.reason}</span>
+    <span>${step.conclusion}</span>
+  `;
+}
+
+function startTeacherMode() {
+  if (isInRoom()) {
+    setMessage('多人房間中請先離開房間，再使用電腦解題教學。');
+    updateTeacherControls();
+    return;
+  }
+  if (state.busy) return;
+
+  const steps = generateTutorialSteps(state.puzzle, state.solution);
+  if (!steps.length) {
+    setMessage('這題目前沒有可教學的步驟，可能已經完成。');
+    return;
+  }
+
+  state.tutor.active = true;
+  state.tutor.steps = steps;
+  state.tutor.stepIndex = 0;
+  state.tutor.startedAtCurrent = [...state.current];
+
+  state.current = [...state.puzzle];
+  state.notes = Array.from({ length: CELLS }, () => new Set());
+  state.selected = state.current.findIndex((value) => value === 0);
+  state.locked = false;
+  state.notesMode = false;
+
+  renderBoard();
+  renderTeacherStep();
+  setMessage(`電腦教學已開始，共 ${steps.length} 步。按「下一步」開始推理。`);
+}
+
+function applyTutorialBoard(stepCount) {
+  state.current = [...state.puzzle];
+  for (let i = 0; i < stepCount; i++) {
+    const step = state.tutor.steps[i];
+    if (!step) break;
+    state.current[step.index] = step.value;
+  }
+  const focusStep = state.tutor.steps[Math.max(0, stepCount - 1)];
+  state.selected = focusStep ? focusStep.index : state.current.findIndex((value) => value === 0);
+  if (state.selected < 0) state.selected = 0;
+}
+
+function nextTeacherStep() {
+  if (!state.tutor.active) {
+    startTeacherMode();
+    return;
+  }
+  if (state.tutor.stepIndex >= state.tutor.steps.length) return;
+
+  state.tutor.stepIndex += 1;
+  applyTutorialBoard(state.tutor.stepIndex);
+  state.notes = Array.from({ length: CELLS }, () => new Set());
+
+  if (state.tutor.stepIndex >= state.tutor.steps.length) {
+    state.locked = true;
+    clearInterval(state.timerId);
+    setMessage('電腦教學已完成整題解答。');
+  } else {
+    const step = state.tutor.steps[state.tutor.stepIndex - 1];
+    setMessage(`第 ${step.number} 步：${step.technique}。`);
+  }
+
+  renderBoard();
+  renderTeacherStep();
+}
+
+function previousTeacherStep() {
+  if (!state.tutor.active || state.tutor.stepIndex <= 0) return;
+  state.tutor.stepIndex -= 1;
+  state.locked = false;
+  applyTutorialBoard(state.tutor.stepIndex);
+  state.notes = Array.from({ length: CELLS }, () => new Set());
+  renderBoard();
+  renderTeacherStep();
+  setMessage(state.tutor.stepIndex === 0 ? '已回到教學起點。' : `已回到第 ${state.tutor.stepIndex} 步。`);
+}
+
+function resetTeacherMode() {
+  if (!state.tutor.active) return;
+  restoreBoardFromTutorStart();
+  clearTutorState();
+  renderTeacherStep();
+  setMessage('已結束電腦教學，並回到開始教學前的盤面。');
+}
+
 
 function formatTime(ms) {
   const totalSeconds = Math.floor(ms / 1000);
@@ -467,7 +895,7 @@ function finishGame() {
   if (state.locked) return;
   state.locked = true;
   clearInterval(state.timerId);
-  const difficulty = DIFFICULTIES[difficultyEl.value].label;
+  const difficulty = getDifficultyInfo(difficultyEl.value).display;
   winText.textContent = `難度：${difficulty}｜時間：${timerEl.textContent}｜錯誤：${state.mistakes}｜提示：${state.hints}`;
   setMessage(isInRoom() ? '恭喜！這個房間已經完成這題數獨。' : '恭喜完成這題數獨！');
   if (typeof winDialog.showModal === 'function') winDialog.showModal();
@@ -486,7 +914,12 @@ function resetState(puzzleData, seed) {
   state.notesMode = false;
   state.seed = seed;
   state.locked = false;
+  state.tutor.active = false;
+  state.tutor.steps = [];
+  state.tutor.stepIndex = 0;
+  state.tutor.startedAtCurrent = [];
   state.room.solvedBy = {};
+  renderTeacherStep();
 }
 
 function setControlsDisabled(disabled) {
@@ -501,12 +934,18 @@ function setControlsDisabled(disabled) {
       el.disabled = disabled;
     });
   updateRoomControls();
+  updateTeacherControls();
 }
 
 function getDifficultyFromUrl() {
   const params = new URLSearchParams(window.location.search);
-  const difficulty = params.get('difficulty');
-  return DIFFICULTIES[difficulty] ? difficulty : 'medium';
+  return normalizeDifficultyKey(params.get('difficulty'));
+}
+
+function getThemeFromUrl() {
+  const params = new URLSearchParams(window.location.search);
+  const theme = params.get('theme');
+  return theme ? normalizeThemeKey(theme) : getSavedTheme();
 }
 
 function getSeedFromUrl() {
@@ -523,7 +962,8 @@ function makeShareUrl(seed = state.seed, difficultyKey = difficultyEl.value) {
   const url = new URL(window.location.href);
   url.searchParams.delete('room');
   url.searchParams.set('seed', seed);
-  url.searchParams.set('difficulty', difficultyKey);
+  url.searchParams.set('difficulty', normalizeDifficultyKey(difficultyKey));
+  url.searchParams.set('theme', state.theme || normalizeThemeKey(themeEl?.value));
   url.hash = '';
   return url.toString();
 }
@@ -533,11 +973,13 @@ function makeRoomUrl(code = state.room.code) {
   url.searchParams.delete('seed');
   url.searchParams.delete('difficulty');
   url.searchParams.set('room', code);
+  url.searchParams.set('theme', state.theme || normalizeThemeKey(themeEl?.value));
   url.hash = '';
   return url.toString();
 }
 
 function updateBrowserUrl(seed, difficultyKey) {
+
   try {
     const url = makeShareUrl(seed, difficultyKey);
     window.history.replaceState(null, '', url);
@@ -554,12 +996,18 @@ function updateBrowserUrlForRoom(code) {
   }
 }
 
+function updateThemeInBrowserUrl() {
+  if (isInRoom()) updateBrowserUrlForRoom(state.room.code);
+  else updateBrowserUrl(state.seed || getSeedFromUrl() || createSeed(), difficultyEl.value);
+}
+
 function removeRoomFromBrowserUrl() {
   try {
     const url = new URL(window.location.href);
     url.searchParams.delete('room');
     url.searchParams.set('seed', state.seed);
-    url.searchParams.set('difficulty', difficultyEl.value);
+    url.searchParams.set('difficulty', normalizeDifficultyKey(difficultyEl.value));
+    url.searchParams.set('theme', state.theme || normalizeThemeKey(themeEl?.value));
     window.history.replaceState(null, '', url.toString());
   } catch (error) {
     // 不影響遊戲。
@@ -572,7 +1020,7 @@ function newGame(options = {}) {
     return;
   }
 
-  const difficultyKey = options.difficultyKey || difficultyEl.value;
+  const difficultyKey = normalizeDifficultyKey(options.difficultyKey || difficultyEl.value);
   const seed = normalizeSeed(options.seed) || createSeed();
   const updateUrl = options.updateUrl !== false;
   difficultyEl.value = difficultyKey;
@@ -589,7 +1037,7 @@ function newGame(options = {}) {
       renderBoard();
       if (updateUrl) updateBrowserUrl(seed, difficultyKey);
       const shareHint = options.fromSharedUrl ? '你正在玩朋友分享的同一題。' : '可按「分享同一題」複製連結給朋友。';
-      setMessage(`${DIFFICULTIES[difficultyKey].label}題目已產生，${shareHint}`);
+      setMessage(`${getDifficultyInfo(difficultyKey).display} 題目已產生，${shareHint}`);
       loadingEl.hidden = true;
       setControlsDisabled(false);
     }, 20);
@@ -846,6 +1294,7 @@ function updateRoomControls() {
     roomBadgeEl.textContent = configured ? '單人' : '未設定';
     roomBadgeEl.classList.toggle('online', configured);
   }
+  updateTeacherControls();
 }
 
 function renderPlayers(players = null, solvedBy = state.room.solvedBy) {
@@ -885,7 +1334,7 @@ function renderPlayers(players = null, solvedBy = state.room.solvedBy) {
 function roomPayloadFromCurrentGame() {
   return {
     seed: state.seed,
-    difficulty: difficultyEl.value,
+    difficulty: normalizeDifficultyKey(difficultyEl.value),
     puzzle: boardToString(state.puzzle),
     solution: boardToString(state.solution),
     current: boardToString(state.current),
@@ -954,7 +1403,7 @@ function applyRoomSnapshot(data, initial = false) {
   }
 
   state.seed = normalizeSeed(data.seed) || state.seed;
-  if (DIFFICULTIES[data.difficulty]) difficultyEl.value = data.difficulty;
+  difficultyEl.value = normalizeDifficultyKey(data.difficulty);
   state.puzzle = puzzle;
   state.solution = solution;
   state.current = current;
@@ -963,6 +1412,7 @@ function applyRoomSnapshot(data, initial = false) {
   state.hints = Number(data.hints || 0);
   state.locked = data.locked === true || state.current.every((value, index) => value === state.solution[index]);
   state.room.solvedBy = normalizeSolvedBy(data.solvedBy);
+  clearTutorState();
 
   if (initial) {
     state.notes = Array.from({ length: CELLS }, () => new Set());
@@ -1135,6 +1585,10 @@ function syncRoomState(move = {}) {
 function bindEvents() {
   newGameBtn.addEventListener('click', () => newGame());
   difficultyEl.addEventListener('change', () => newGame());
+  themeEl.addEventListener('change', () => {
+    applyTheme(themeEl.value, { updateUrl: true });
+    setMessage(`已切換為 ${THEMES[state.theme].label}。`);
+  });
   shareBtn.addEventListener('click', copyShareLink);
   createRoomBtn.addEventListener('click', createRoom);
   copyRoomLinkBtn.addEventListener('click', copyRoomLink);
@@ -1158,6 +1612,10 @@ function bindEvents() {
   eraseBtn.addEventListener('click', eraseSelected);
   hintBtn.addEventListener('click', giveHint);
   checkBtn.addEventListener('click', checkBoard);
+  teacherStartBtn?.addEventListener('click', startTeacherMode);
+  teacherPrevBtn?.addEventListener('click', previousTeacherStep);
+  teacherNextBtn?.addEventListener('click', nextTeacherStep);
+  teacherResetBtn?.addEventListener('click', resetTeacherMode);
 
   document.addEventListener('keydown', (event) => {
     const activeTag = document.activeElement?.tagName?.toLowerCase();
@@ -1167,6 +1625,7 @@ function bindEvents() {
     else if (event.key === 'Backspace' || event.key === 'Delete' || event.key === '0') eraseSelected();
     else if (event.key.toLowerCase() === 'n') noteBtn.click();
     else if (event.key.toLowerCase() === 'h') giveHint();
+    else if (event.key.toLowerCase() === 't') startTeacherMode();
     else if (event.key === 'ArrowUp') { event.preventDefault(); moveSelection(-1, 0); }
     else if (event.key === 'ArrowDown') { event.preventDefault(); moveSelection(1, 0); }
     else if (event.key === 'ArrowLeft') { event.preventDefault(); moveSelection(0, -1); }
@@ -1184,11 +1643,16 @@ function bindEvents() {
 }
 
 function init() {
+  populateDifficultyOptions();
+  populateThemeOptions();
+  applyTheme(getThemeFromUrl());
+  difficultyEl.value = getDifficultyFromUrl();
   buildBoard();
   buildPad();
   setupPlayerName();
   bindEvents();
   setupFirebase();
+  renderTeacherStep();
 
   const roomCode = getRoomFromUrl();
   const sharedSeed = getSeedFromUrl();

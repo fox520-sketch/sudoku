@@ -7,23 +7,22 @@
   <title>海洋風數獨 Ocean Sudoku</title>
   <link rel="stylesheet" href="styles.css" />
 </head>
-<body>
+<body data-theme="ocean">
   <div class="shell">
     <header class="hero card">
       <div>
         <p class="eyebrow">Ocean Sudoku</p>
         <h1>海洋風數獨</h1>
-        <p class="subtitle">自動產生唯一解題目，支援分享同一題網址、多人即時房間、手機、鍵盤、筆記、提示與難度選擇。</p>
+        <p class="subtitle">自動產生唯一解題目，支援 1～20 級難度、分享同一題網址、多人即時房間、手機、鍵盤、筆記、提示、多種主題風格與電腦解題教學。</p>
       </div>
       <div class="controls" aria-label="遊戲控制">
         <label class="select-wrap">
           <span>難度</span>
-          <select id="difficulty" aria-label="選擇難度">
-            <option value="easy">簡單</option>
-            <option value="medium" selected>中等</option>
-            <option value="hard">困難</option>
-            <option value="expert">專家</option>
-          </select>
+          <select id="difficulty" aria-label="選擇難度"></select>
+        </label>
+        <label class="select-wrap">
+          <span>風格</span>
+          <select id="theme" aria-label="選擇主題風格"></select>
         </label>
         <button id="newGameBtn" class="primary">新題目</button>
         <button id="shareBtn" class="secondary" type="button">分享同一題</button>
@@ -82,9 +81,31 @@
 
         <div class="number-pad" id="numberPad" aria-label="數字鍵盤"></div>
 
+        <section class="teacher-panel" aria-label="電腦解題教學">
+          <div class="teacher-heading">
+            <div>
+              <p class="mini-eyebrow">Tutor</p>
+              <h2>電腦解題教學</h2>
+            </div>
+            <span id="teacherBadge" class="teacher-badge">未開始</span>
+          </div>
+          <p id="teacherStatus" class="teacher-status">選好題目後，按「開始教學」，電腦會從原題開始，一步一步示範如何思考。</p>
+          <div class="teacher-actions">
+            <button id="teacherStartBtn" class="tool" type="button">開始教學</button>
+            <button id="teacherPrevBtn" class="tool" type="button" disabled>上一步</button>
+            <button id="teacherNextBtn" class="tool" type="button" disabled>下一步</button>
+            <button id="teacherResetBtn" class="tool" type="button" disabled>結束教學</button>
+          </div>
+          <article id="teacherStep" class="teacher-step">
+            <strong>教學模式會說明：</strong>
+            <span>候選數、唯一候選、隱性唯一，以及必要時的進階推理示範。</span>
+          </article>
+        </section>
+
         <details class="help">
           <summary>玩法說明</summary>
           <p>每一列、每一行、每個 3×3 宮格都必須填入 1～9，且不能重複。</p>
+          <p>難度共有 1～20 級：1 級最簡單，20 級最難。你也可以在海洋風、護眼風、電子紙、暮光風、櫻花風、森林風之間切換，並使用電腦解題教學逐步學習解法。</p>
           <p>快捷鍵：1～9 輸入，Backspace 清除，N 切換筆記，H 使用提示。按「分享同一題」可複製含題目種子的網址。</p>
           <p>多人房間：建立房間後把房間連結傳給朋友，大家會同步同一盤的填數字進度；系統會分開統計每位玩家正確填入的格數，提示不列入個人解題數。筆記與選取格目前是個人本機狀態。</p>
         </details>

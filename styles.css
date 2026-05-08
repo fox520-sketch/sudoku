@@ -1322,6 +1322,31 @@ body.tutor-active .teacher-step {
 }
 
 
+/* 狀態與除錯面板 */
+.debug-panel {
+  margin-top: 10px;
+  border: 1px solid var(--line);
+  border-radius: 16px;
+  background: rgba(255,255,255,.62);
+  color: var(--muted);
+  padding: 8px 12px;
+  font-size: .84rem;
+}
+
+.debug-panel summary {
+  cursor: pointer;
+  color: var(--ocean-deep);
+  font-weight: 900;
+}
+
+.debug-panel pre {
+  white-space: pre-wrap;
+  word-break: break-word;
+  margin: 8px 0 0;
+  line-height: 1.55;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+}
+
 /* 模式切換：一般遊玩時隱藏電腦教學；電腦教學時隱藏其他操作面板。 */
 body:not(.teacher-mode) .teacher-panel {
   display: none !important;
@@ -1350,10 +1375,10 @@ body.teacher-mode:not(.tutor-active) .teacher-panel {
   }
 }
 
-/* 教學面板：穩定拖曳 + 可縮放視窗框 */
+/* 教學面板：桌面拖曳 + 縮放，手機底部抽屜 */
 .teacher-window-bar {
   display: none;
-  grid-template-columns: minmax(0, 1fr) auto;
+  grid-template-columns: minmax(0, 1fr) auto auto;
   align-items: center;
   gap: 8px;
   border-radius: 18px;
@@ -1395,8 +1420,8 @@ body.teacher-mode:not(.tutor-active) .teacher-panel {
   position: absolute;
   right: 8px;
   bottom: 8px;
-  width: 24px;
-  height: 24px;
+  width: 26px;
+  height: 26px;
   border-radius: 8px;
   cursor: nwse-resize;
   touch-action: none;
@@ -1411,9 +1436,11 @@ body.teacher-mode:not(.tutor-active) .teacher-panel {
   background-color: color-mix(in srgb, var(--selected) 34%, transparent);
 }
 
-
-body.tutor-active .teacher-panel.teacher-panel-portaled {
+body.tutor-active .teacher-panel.teacher-panel-portaled,
+body.tutor-active .teacher-panel.free-teacher-window {
   display: grid !important;
+  visibility: visible !important;
+  opacity: 1 !important;
 }
 
 body.tutor-active .teacher-panel.free-teacher-window {
@@ -1422,18 +1449,25 @@ body.tutor-active .teacher-panel.free-teacher-window {
   top: 0;
   right: auto !important;
   bottom: auto !important;
-  min-width: 300px;
-  min-height: 220px;
-  max-width: calc(100vw - 20px);
-  max-height: none !important;
+  min-width: 320px;
+  min-height: 230px;
+  max-width: calc(100vw - 24px);
+  max-height: calc(100vh - 24px) !important;
   overflow: auto;
   resize: none;
-  z-index: 40;
+  z-index: 1000;
   margin: 0;
-  padding-bottom: 34px;
-  background: color-mix(in srgb, var(--card) 88%, white);
+  padding-bottom: 38px;
+  background: color-mix(in srgb, var(--card) 90%, white);
   backdrop-filter: blur(18px);
   border: 1px solid var(--line);
+}
+
+
+body.tutor-active > .teacher-panel.teacher-panel-portaled {
+  position: fixed;
+  z-index: 1000;
+  margin: 0;
 }
 
 body.tutor-active .teacher-window-bar {
@@ -1447,6 +1481,7 @@ body.tutor-active .teacher-resize-handle {
 body.dragging-teacher-panel,
 body.resizing-teacher-panel {
   user-select: none;
+  cursor: grabbing;
 }
 
 body.dragging-teacher-panel .teacher-drag-handle {
@@ -1460,6 +1495,21 @@ body.resizing-teacher-panel .teacher-resize-handle {
 body.dragging-teacher-panel .teacher-panel,
 body.resizing-teacher-panel .teacher-panel {
   transition: none !important;
+}
+
+body.teacher-panel-collapsed.tutor-active .teacher-panel.free-teacher-window {
+  height: auto !important;
+  min-height: 0;
+  overflow: visible;
+  padding-bottom: 12px;
+}
+
+body.teacher-panel-collapsed.tutor-active .teacher-heading,
+body.teacher-panel-collapsed.tutor-active .teacher-status,
+body.teacher-panel-collapsed.tutor-active .teacher-actions,
+body.teacher-panel-collapsed.tutor-active .teacher-step,
+body.teacher-panel-collapsed.tutor-active .teacher-resize-handle {
+  display: none !important;
 }
 
 body[data-theme] .teacher-window-bar,
@@ -1477,26 +1527,72 @@ body[data-theme="dusk"] .teacher-drag-handle {
 }
 
 @media (max-width: 860px) {
+  body.tutor-active .shell {
+    padding-bottom: max(260px, calc(260px + env(safe-area-inset-bottom)));
+  }
+
   body.tutor-active .teacher-panel.free-teacher-window {
-    left: 10px;
-    top: auto;
+    left: 10px !important;
     right: auto !important;
-    bottom: auto !important;
-    width: calc(100vw - 20px);
-    min-width: min(300px, calc(100vw - 20px));
-    max-width: calc(100vw - 20px);
-    min-height: 190px;
-    padding: 10px 10px 30px;
+    top: auto !important;
+    bottom: max(8px, env(safe-area-inset-bottom)) !important;
+    width: calc(100vw - 20px) !important;
+    height: auto !important;
+    min-width: 0;
+    min-height: 0;
+    max-width: calc(100vw - 20px) !important;
+    max-height: min(46vh, 360px) !important;
+    overflow: auto;
+    padding: 10px 10px 18px;
+    border-radius: 20px;
   }
 
   body.tutor-active .teacher-window-bar {
-    grid-template-columns: 1fr auto;
+    grid-template-columns: 1fr auto auto;
     padding: 6px;
+    position: sticky;
+    top: 0;
+    z-index: 2;
   }
 
   body.tutor-active .teacher-drag-handle {
     min-height: 32px;
     padding: 0 10px;
     font-size: .82rem;
+    cursor: default;
+  }
+
+  body.tutor-active .teacher-drag-handle::before {
+    content: "☰";
+  }
+
+  body.tutor-active .teacher-resize-handle {
+    display: none;
+  }
+
+  body.teacher-panel-collapsed.tutor-active .teacher-panel.free-teacher-window {
+    max-height: none !important;
+    padding-bottom: 10px;
+  }
+
+  body.tutor-active .teacher-actions {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    gap: 6px;
+  }
+
+  body.tutor-active .teacher-actions .tool {
+    min-height: 38px;
+    padding: 0 5px;
+    font-size: .78rem;
+  }
+
+  body.tutor-active .teacher-step {
+    max-height: 8.8rem;
+  }
+
+  body.tutor-active .dock-btn {
+    min-height: 30px;
+    padding: 0 8px;
+    font-size: .78rem;
   }
 }

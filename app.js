@@ -2,6 +2,8 @@ const BOARD_SIZE = 9;
 const BOX_SIZE = 3;
 const CELLS = 81;
 const DIGITS = [1, 2, 3, 4, 5, 6, 7, 8, 9];
+const ROW_LABELS = ['a', 'b', 'c', 'd', 'e', 'f', 'g', 'h', 'i'];
+const COL_LABELS = ['1', '2', '3', '4', '5', '6', '7', '8', '9'];
 const ROOM_PREFIX = 'OCEAN-';
 const ROOM_CHARS = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
 
@@ -68,6 +70,45 @@ function getDifficultyInfo(key = difficultyEl.value) {
   return DIFFICULTIES[normalizeDifficultyKey(key)] || DIFFICULTIES['8'];
 }
 
+function normalizePlayMode(value) {
+  const key = String(value || '').trim();
+  return PLAY_MODES[key] ? key : 'normal';
+}
+
+function getSavedPlayMode() {
+  return normalizePlayMode(localStorage.getItem('oceanSudokuPlayMode'));
+}
+
+function savePlayMode(mode) {
+  localStorage.setItem('oceanSudokuPlayMode', normalizePlayMode(mode));
+}
+
+function isTeacherMode() {
+  return state.playMode === 'teacher';
+}
+
+function setPlayMode(mode, options = {}) {
+  const nextMode = normalizePlayMode(mode);
+  const wasTeacherMode = state.playMode === 'teacher';
+  state.playMode = nextMode;
+  savePlayMode(nextMode);
+  if (playModeEl) playModeEl.value = nextMode;
+  document.body.classList.toggle('teacher-mode', nextMode === 'teacher');
+
+  if (wasTeacherMode && nextMode !== 'teacher' && state.tutor?.active) {
+    resetTeacherMode();
+  }
+
+  updateTeacherControls();
+  renderTeacherStep();
+
+  if (!options.silent) {
+    setMessage(nextMode === 'teacher'
+      ? '已切換到電腦教學模式，其他操作面板已隱藏。'
+      : '已切換到一般遊玩模式，電腦教學面板已隱藏。');
+  }
+}
+
 const DIFFICULTY_NAMES = {
   1: '最簡單',
   2: '很簡單',
@@ -120,6 +161,11 @@ const THEMES = {
   forest: { label: '森林風', themeColor: '#3f7a55' }
 };
 
+const PLAY_MODES = {
+  normal: { label: '一般遊玩' },
+  teacher: { label: '電腦教學' }
+};
+
 const $ = (selector) => document.querySelector(selector);
 const boardEl = $('#board');
 const boardPanelEl = document.querySelector('.board-panel');
@@ -130,6 +176,7 @@ const mistakesEl = $('#mistakes');
 const hintsEl = $('#hints');
 const difficultyEl = $('#difficulty');
 const themeEl = $('#theme');
+const playModeEl = $('#playMode');
 const loadingEl = $('#loading');
 const newGameBtn = $('#newGameBtn');
 const shareBtn = $('#shareBtn');
@@ -155,6 +202,8 @@ const teacherResetBtn = $('#teacherResetBtn');
 const teacherStatusEl = $('#teacherStatus');
 const teacherStepEl = $('#teacherStep');
 const teacherBadgeEl = $('#teacherBadge');
+const teacherPanelEl = document.querySelector('.teacher-panel');
+const teacherDragHandleEl = $('#teacherDragHandle');
 
 const state = {
   puzzle: Array(CELLS).fill(0),
@@ -173,11 +222,19 @@ const state = {
   locked: false,
   busy: false,
   theme: 'ocean',
+  playMode: 'normal',
   tutor: {
     active: false,
     steps: [],
     stepIndex: 0,
-    startedAtCurrent: []
+    startedAtCurrent: [],
+    panelDrag: {
+      active: false,
+      startX: 0,
+      startY: 0,
+      originX: 0,
+      originY: 0
+    }
   },
   room: {
     configured: false,
@@ -383,14 +440,18 @@ function createPuzzle(difficultyKey, seed) {
 }
 
 
+function rowLabel(row) { return ROW_LABELS[row] || String(row + 1); }
+function colLabel(col) { return COL_LABELS[col] || String(col + 1); }
+function cellCoordinate(index) { return `${rowLabel(rowOf(index))}${colLabel(colOf(index))}`; }
+
 function cellLabel(index) {
-  return `第 ${rowOf(index) + 1} 列第 ${colOf(index) + 1} 行`;
+  return `${cellCoordinate(index)}（第 ${rowLabel(rowOf(index))} 列、第 ${colLabel(colOf(index))} 行）`;
 }
 
 function unitName(type, unitIndex) {
-  if (type === 'row') return `第 ${unitIndex + 1} 列`;
-  if (type === 'col') return `第 ${unitIndex + 1} 行`;
-  return `第 ${unitIndex + 1} 宮`;
+  if (type === 'row') return `第 ${rowLabel(unitIndex)} 列`;
+  if (type === 'col') return `第 ${colLabel(unitIndex)} 行`;
+  return `第 ${unitIndex + 1} 宮（3×3 宮格）`;
 }
 
 function unitCells(type, unitIndex) {
@@ -428,7 +489,7 @@ function getEliminationReason(board, index, candidates) {
   const rowCells = unitCells('row', rowOf(index));
   const colCells = unitCells('col', colOf(index));
   const boxCells = unitCells('box', boxOf(index));
-  return `觀察 ${cellLabel(index)}：同列已有 ${formatNumbers(presentNumbersInUnit(board, rowCells))}；同行已有 ${formatNumbers(presentNumbersInUnit(board, colCells))}；同宮已有 ${formatNumbers(presentNumbersInUnit(board, boxCells))}。排除後，候選數只剩 ${formatCandidateList(candidates)}。`;
+  return `觀察 ${cellLabel(index)}：同列已有 ${formatNumbers(presentNumbersInUnit(board, rowCells))}；同行已有 ${formatNumbers(presentNumbersInUnit(board, colCells))}；同一個 3×3 宮格已有 ${formatNumbers(presentNumbersInUnit(board, boxCells))}。這裡的「宮格」就是包住這格的 3×3 小方塊。排除後，候選數只剩 ${formatCandidateList(candidates)}。`;
 }
 
 function findNakedSingleStep(board, solution, candidateSnapshot) {
@@ -533,6 +594,7 @@ function clearTutorState() {
   state.tutor.steps = [];
   state.tutor.stepIndex = 0;
   state.tutor.startedAtCurrent = [];
+  resetTeacherPanelPosition();
   updateTeacherControls();
 }
 
@@ -554,12 +616,14 @@ function updateTeacherControls() {
   const total = state.tutor.steps.length;
   const stepIndex = state.tutor.stepIndex;
   const roomMode = isInRoom();
-  document.body.classList.toggle('tutor-active', active);
+  const teacherMode = isTeacherMode();
+  document.body.classList.toggle('teacher-mode', teacherMode);
+  document.body.classList.toggle('tutor-active', active && teacherMode);
 
-  teacherStartBtn.disabled = state.busy || roomMode;
-  teacherPrevBtn.disabled = state.busy || !active || stepIndex <= 0;
-  teacherNextBtn.disabled = state.busy || !active || stepIndex >= total;
-  teacherResetBtn.disabled = state.busy || !active;
+  teacherStartBtn.disabled = state.busy || roomMode || !teacherMode;
+  teacherPrevBtn.disabled = state.busy || !active || stepIndex <= 0 || !teacherMode;
+  teacherNextBtn.disabled = state.busy || !active || stepIndex >= total || !teacherMode;
+  teacherResetBtn.disabled = state.busy || !active || !teacherMode;
 
   if (teacherBadgeEl) {
     if (roomMode) teacherBadgeEl.textContent = '單人可用';
@@ -575,6 +639,12 @@ function updateTeacherControls() {
 function renderTeacherStep() {
   if (!teacherStepEl || !teacherStatusEl) return;
   updateTeacherControls();
+
+  if (!isTeacherMode()) {
+    teacherStatusEl.textContent = '切換到「電腦教學」模式後，才會顯示教學功能。';
+    teacherStepEl.innerHTML = '<strong>電腦教學已隱藏：</strong><span>一般遊玩模式會顯示多人房間、筆記、提示與數字鍵盤。</span>';
+    return;
+  }
 
   if (!state.tutor.active) {
     teacherStatusEl.textContent = '選好題目後，按「開始教學」，電腦會從原題開始，一步一步示範如何思考。';
@@ -602,6 +672,84 @@ function renderTeacherStep() {
   `;
 }
 
+
+function resetTeacherPanelPosition() {
+  if (!teacherPanelEl) return;
+  const drag = state.tutor.panelDrag;
+  drag.active = false;
+  teacherPanelEl.classList.remove('dragging', 'user-positioned');
+  teacherPanelEl.style.left = '';
+  teacherPanelEl.style.top = '';
+  teacherPanelEl.style.right = '';
+  teacherPanelEl.style.bottom = '';
+}
+
+function clampNumber(value, min, max) {
+  return Math.min(Math.max(value, min), max);
+}
+
+function moveTeacherPanelTo(left, top) {
+  if (!teacherPanelEl) return;
+  const rect = teacherPanelEl.getBoundingClientRect();
+  const margin = 8;
+  const maxLeft = Math.max(margin, window.innerWidth - rect.width - margin);
+  const maxTop = Math.max(margin, window.innerHeight - rect.height - margin);
+  const nextLeft = clampNumber(left, margin, maxLeft);
+  const nextTop = clampNumber(top, margin, maxTop);
+  teacherPanelEl.style.left = `${nextLeft}px`;
+  teacherPanelEl.style.top = `${nextTop}px`;
+  teacherPanelEl.style.right = 'auto';
+  teacherPanelEl.style.bottom = 'auto';
+  teacherPanelEl.classList.add('user-positioned');
+}
+
+function isTeacherPanelFloating() {
+  return document.body.classList.contains('tutor-active') && teacherPanelEl;
+}
+
+function setupTeacherPanelDrag() {
+  if (!teacherPanelEl || !teacherDragHandleEl) return;
+
+  teacherDragHandleEl.addEventListener('pointerdown', (event) => {
+    if (!isTeacherPanelFloating()) return;
+    event.preventDefault();
+    const rect = teacherPanelEl.getBoundingClientRect();
+    state.tutor.panelDrag = {
+      active: true,
+      startX: event.clientX,
+      startY: event.clientY,
+      originX: rect.left,
+      originY: rect.top
+    };
+    teacherPanelEl.classList.add('dragging');
+    teacherDragHandleEl.setPointerCapture?.(event.pointerId);
+  });
+
+  window.addEventListener('pointermove', (event) => {
+    const drag = state.tutor.panelDrag;
+    if (!drag.active) return;
+    event.preventDefault();
+    moveTeacherPanelTo(
+      drag.originX + event.clientX - drag.startX,
+      drag.originY + event.clientY - drag.startY
+    );
+  }, { passive: false });
+
+  const endDrag = () => {
+    if (!state.tutor.panelDrag.active) return;
+    state.tutor.panelDrag.active = false;
+    teacherPanelEl.classList.remove('dragging');
+  };
+
+  window.addEventListener('pointerup', endDrag);
+  window.addEventListener('pointercancel', endDrag);
+  window.addEventListener('resize', () => {
+    if (!teacherPanelEl.classList.contains('user-positioned')) return;
+    const rect = teacherPanelEl.getBoundingClientRect();
+    moveTeacherPanelTo(rect.left, rect.top);
+  });
+}
+
 function keepBoardVisibleDuringTeaching() {
   if (!boardPanelEl) return;
   const prefersReducedMotion = window.matchMedia?.('(prefers-reduced-motion: reduce)')?.matches;
@@ -616,6 +764,9 @@ function keepBoardVisibleDuringTeaching() {
 }
 
 function startTeacherMode() {
+  if (!isTeacherMode()) {
+    setPlayMode('teacher', { silent: true });
+  }
   if (isInRoom()) {
     setMessage('多人房間中請先離開房間，再使用電腦解題教學。');
     updateTeacherControls();
@@ -729,8 +880,10 @@ function buildBoard() {
     cell.className = 'cell';
     cell.type = 'button';
     cell.dataset.index = String(i);
+    cell.dataset.coord = cellCoordinate(i);
     cell.setAttribute('role', 'gridcell');
-    cell.setAttribute('aria-label', `第 ${rowOf(i) + 1} 列，第 ${colOf(i) + 1} 行`);
+    cell.setAttribute('aria-label', `${cellLabel(i)}，座標 ${cellCoordinate(i)}`);
+    cell.title = cellLabel(i);
     cell.addEventListener('click', () => selectCell(i));
     boardEl.appendChild(cell);
   }
@@ -1611,6 +1764,7 @@ function bindEvents() {
     applyTheme(themeEl.value, { updateUrl: true });
     setMessage(`已切換為 ${THEMES[state.theme].label}。`);
   });
+  playModeEl?.addEventListener('change', () => setPlayMode(playModeEl.value));
   shareBtn.addEventListener('click', copyShareLink);
   createRoomBtn.addEventListener('click', createRoom);
   copyRoomLinkBtn.addEventListener('click', copyRoomLink);
@@ -1647,7 +1801,10 @@ function bindEvents() {
     else if (event.key === 'Backspace' || event.key === 'Delete' || event.key === '0') eraseSelected();
     else if (event.key.toLowerCase() === 'n') noteBtn.click();
     else if (event.key.toLowerCase() === 'h') giveHint();
-    else if (event.key.toLowerCase() === 't') startTeacherMode();
+    else if (event.key.toLowerCase() === 't') {
+      if (!isTeacherMode()) setPlayMode('teacher');
+      else startTeacherMode();
+    }
     else if (event.key === 'ArrowUp') { event.preventDefault(); moveSelection(-1, 0); }
     else if (event.key === 'ArrowDown') { event.preventDefault(); moveSelection(1, 0); }
     else if (event.key === 'ArrowLeft') { event.preventDefault(); moveSelection(0, -1); }
@@ -1668,9 +1825,11 @@ function init() {
   populateDifficultyOptions();
   populateThemeOptions();
   applyTheme(getThemeFromUrl());
+  setPlayMode(getSavedPlayMode(), { silent: true });
   difficultyEl.value = getDifficultyFromUrl();
   buildBoard();
   buildPad();
+  setupTeacherPanelDrag();
   setupPlayerName();
   bindEvents();
   setupFirebase();
@@ -1680,6 +1839,7 @@ function init() {
   const sharedSeed = getSeedFromUrl();
 
   if (roomCode && state.room.configured) {
+    setPlayMode('normal', { silent: true });
     newGame({ updateUrl: false });
     enterRoom(roomCode);
   } else if (sharedSeed) {

@@ -24,6 +24,13 @@
           <span>風格</span>
           <select id="theme" aria-label="選擇主題風格"></select>
         </label>
+        <label class="select-wrap">
+          <span>模式</span>
+          <select id="playMode" aria-label="選擇遊玩模式">
+            <option value="normal">一般遊玩</option>
+            <option value="teacher">電腦教學</option>
+          </select>
+        </label>
         <button id="newGameBtn" class="primary">新題目</button>
         <button id="shareBtn" class="secondary" type="button">分享同一題</button>
       </div>
@@ -37,7 +44,16 @@
           <div><span class="stat-label">提示</span><strong id="hints">0</strong></div>
         </div>
 
-        <div id="board" class="board" role="grid" aria-label="9乘9數獨盤面"></div>
+        <div class="board-shell" aria-label="數獨座標盤面：上方是行 1 到 9，左側是列 a 到 i。">
+          <div class="axis-corner" aria-hidden="true"></div>
+          <div class="col-axis" aria-hidden="true">
+            <span>1</span><span>2</span><span>3</span><span>4</span><span>5</span><span>6</span><span>7</span><span>8</span><span>9</span>
+          </div>
+          <div class="row-axis" aria-hidden="true">
+            <span>a</span><span>b</span><span>c</span><span>d</span><span>e</span><span>f</span><span>g</span><span>h</span><span>i</span>
+          </div>
+          <div id="board" class="board" role="grid" aria-label="9乘9數獨盤面，上方行標示為1到9，左側列標示為a到i"></div>
+        </div>
 
         <div class="message" id="message">選一格，再輸入數字。</div>
 
@@ -49,6 +65,7 @@
             </div>
             <span id="teacherBadge" class="teacher-badge">未開始</span>
           </div>
+          <div id="teacherDragHandle" class="teacher-drag-handle" role="button" tabindex="0" aria-label="拖曳移動電腦教學面板">拖曳移動教學面板</div>
           <p id="teacherStatus" class="teacher-status">選好題目後，按「開始教學」，電腦會從原題開始，一步一步示範如何思考。</p>
           <div class="teacher-actions">
             <button id="teacherStartBtn" class="tool" type="button">開始教學</button>
@@ -105,8 +122,8 @@
 
         <details class="help">
           <summary>玩法說明</summary>
-          <p>每一列、每一行、每個 3×3 宮格都必須填入 1～9，且不能重複。</p>
-          <p>難度共有 1～20 級：1 級最簡單，20 級最難。你也可以在海洋風、護眼風、電子紙、暮光風、櫻花風、森林風之間切換，並使用電腦解題教學逐步學習解法。</p>
+          <p>每一列、每一行、每個 3×3 宮格都必須填入 1～9；盤面上方的 1～9 是「行」，左側的 a～i 是「列」，且不能重複。</p>
+          <p>難度共有 1～20 級：1 級最簡單，20 級最難。你也可以在海洋風、護眼風、電子紙、暮光風、櫻花風、森林風之間切換，並使用電腦解題教學逐步學習解法。教學中的「同宮」是指同一個 3×3 小方塊。</p>
           <p>快捷鍵：1～9 輸入，Backspace 清除，N 切換筆記，H 使用提示。按「分享同一題」可複製含題目種子的網址。</p>
           <p>多人房間：建立房間後把房間連結傳給朋友，大家會同步同一盤的填數字進度；系統會分開統計每位玩家正確填入的格數，提示不列入個人解題數。筆記與選取格目前是個人本機狀態。</p>
         </details>

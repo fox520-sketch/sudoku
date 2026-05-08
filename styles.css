@@ -22,6 +22,17 @@
   --foam-2: rgba(255,255,255,.55);
   --foam-3: rgba(255,255,255,.6);
   --dialog-backdrop: rgba(4, 44, 57, .3);
+  --surface-strong: rgba(255, 255, 255, 0.94);
+  --control-bg: rgba(255, 255, 255, 0.96);
+  --control-text: #07556b;
+  --control-muted: #496d76;
+  --primary-text: #ffffff;
+  --cell-bg: #fbfeff;
+  --cell-text: #064d63;
+  --given-bg: #fff4d6;
+  --axis-bg: rgba(255, 255, 255, 0.86);
+  --danger-bg: rgba(255, 239, 243, 0.94);
+  --danger-text: #8d2531;
 }
 
 body[data-theme="ocean"] {
@@ -48,6 +59,17 @@ body[data-theme="ocean"] {
   --foam-2: rgba(255,255,255,.55);
   --foam-3: rgba(255,255,255,.6);
   --dialog-backdrop: rgba(4, 44, 57, .3);
+  --surface-strong: rgba(255, 255, 255, 0.94);
+  --control-bg: rgba(255, 255, 255, 0.96);
+  --control-text: #07556b;
+  --control-muted: #496d76;
+  --primary-text: #ffffff;
+  --cell-bg: #fbfeff;
+  --cell-text: #064d63;
+  --given-bg: #fff4d6;
+  --axis-bg: rgba(255, 255, 255, 0.86);
+  --danger-bg: rgba(255, 239, 243, 0.94);
+  --danger-text: #8d2531;
 }
 
 body[data-theme="eyeCare"] {
@@ -74,6 +96,17 @@ body[data-theme="eyeCare"] {
   --foam-2: rgba(232,241,214,.72);
   --foam-3: rgba(246,250,235,.62);
   --dialog-backdrop: rgba(61, 76, 28, .24);
+  --surface-strong: rgba(255, 255, 250, 0.95);
+  --control-bg: rgba(255, 255, 250, 0.97);
+  --control-text: #405025;
+  --control-muted: #586442;
+  --primary-text: #ffffff;
+  --cell-bg: #fffef7;
+  --cell-text: #37431f;
+  --given-bg: #f4efd4;
+  --axis-bg: rgba(255, 255, 250, 0.9);
+  --danger-bg: rgba(255, 240, 235, 0.95);
+  --danger-text: #7f2b20;
 }
 
 body[data-theme="epaper"] {
@@ -100,6 +133,17 @@ body[data-theme="epaper"] {
   --foam-2: rgba(235,232,224,.58);
   --foam-3: rgba(223,220,212,.5);
   --dialog-backdrop: rgba(80, 80, 80, .2);
+  --surface-strong: rgba(250, 249, 244, 0.98);
+  --control-bg: rgba(250, 249, 244, 0.99);
+  --control-text: #33332f;
+  --control-muted: #555550;
+  --primary-text: #ffffff;
+  --cell-bg: #fbfaf4;
+  --cell-text: #2f2f2b;
+  --given-bg: #eeebe1;
+  --axis-bg: rgba(250, 249, 244, 0.95);
+  --danger-bg: rgba(245, 228, 225, 0.96);
+  --danger-text: #7c2d2a;
 }
 
 body[data-theme="dusk"] {
@@ -126,6 +170,17 @@ body[data-theme="dusk"] {
   --foam-2: rgba(183,197,255,.09);
   --foam-3: rgba(130,145,229,.11);
   --dialog-backdrop: rgba(10, 12, 26, .58);
+  --surface-strong: rgba(32, 40, 78, 0.96);
+  --control-bg: rgba(32, 40, 78, 0.96);
+  --control-text: #f7f8ff;
+  --control-muted: #dfe5ff;
+  --primary-text: #12204c;
+  --cell-bg: #f8f9ff;
+  --cell-text: #1d2754;
+  --given-bg: #dbe4ff;
+  --axis-bg: rgba(32, 40, 78, 0.96);
+  --danger-bg: rgba(255, 231, 238, 0.96);
+  --danger-text: #8a2336;
 }
 
 body[data-theme="sakura"] {
@@ -152,6 +207,17 @@ body[data-theme="sakura"] {
   --foam-2: rgba(255,232,240,.58);
   --foam-3: rgba(255,216,230,.55);
   --dialog-backdrop: rgba(90, 41, 62, .24);
+  --surface-strong: rgba(255, 255, 255, 0.95);
+  --control-bg: rgba(255, 255, 255, 0.97);
+  --control-text: #773d56;
+  --control-muted: #70495b;
+  --primary-text: #ffffff;
+  --cell-bg: #fffdfd;
+  --cell-text: #6f334c;
+  --given-bg: #fff0f5;
+  --axis-bg: rgba(255, 255, 255, 0.9);
+  --danger-bg: rgba(255, 236, 242, 0.96);
+  --danger-text: #8a2340;
 }
 
 body[data-theme="forest"] {
@@ -178,6 +244,17 @@ body[data-theme="forest"] {
   --foam-2: rgba(224,245,230,.58);
   --foam-3: rgba(203,233,210,.56);
   --dialog-backdrop: rgba(34, 66, 41, .22);
+  --surface-strong: rgba(255, 255, 255, 0.95);
+  --control-bg: rgba(255, 255, 255, 0.97);
+  --control-text: #244c35;
+  --control-muted: #435c4b;
+  --primary-text: #ffffff;
+  --cell-bg: #fbfffc;
+  --cell-text: #1e422e;
+  --given-bg: #eff8e8;
+  --axis-bg: rgba(255, 255, 255, 0.9);
+  --danger-bg: rgba(255, 239, 235, 0.96);
+  --danger-text: #7f2b20;
 }
 
 * { box-sizing: border-box; }
@@ -875,6 +952,114 @@ select:focus {
   .player-chip { font-size: .82rem; }
 }
 
+
+
+/* 可讀性統一優化：所有主題都使用高對比的表面、文字與盤面色。 */
+body[data-theme] {
+  text-rendering: optimizeLegibility;
+}
+
+body[data-theme] .subtitle,
+body[data-theme] .select-wrap,
+body[data-theme] .stat-label,
+body[data-theme] .message,
+body[data-theme] .field,
+body[data-theme] .room-status,
+body[data-theme] .teacher-status,
+body[data-theme] .teacher-step span,
+body[data-theme] .help,
+body[data-theme] .teacher-badge,
+body[data-theme] .room-badge {
+  color: var(--control-muted);
+}
+
+body[data-theme] select,
+body[data-theme] input,
+body[data-theme] .secondary,
+body[data-theme] .stats div,
+body[data-theme] .col-axis span,
+body[data-theme] .row-axis span,
+body[data-theme] .room-badge,
+body[data-theme] .teacher-badge,
+body[data-theme] .player-chip,
+body[data-theme] .teacher-step,
+body[data-theme] .teacher-drag-handle {
+  background: var(--control-bg);
+  color: var(--control-text);
+  border-color: color-mix(in srgb, var(--control-text) 22%, transparent);
+}
+
+body[data-theme] input::placeholder {
+  color: color-mix(in srgb, var(--control-muted) 72%, white);
+  opacity: 1;
+}
+
+body[data-theme] .secondary,
+body[data-theme] .tool,
+body[data-theme] .number-pad button {
+  color: var(--control-text);
+  box-shadow: 0 8px 18px color-mix(in srgb, var(--control-text) 12%, transparent);
+}
+
+body[data-theme] .primary {
+  color: var(--primary-text);
+}
+
+body[data-theme] .leave {
+  color: var(--danger-text);
+  background: var(--danger-bg);
+}
+
+body[data-theme] .help summary,
+body[data-theme] .teacher-step strong,
+body[data-theme] .room-heading h2,
+body[data-theme] .teacher-heading h2,
+body[data-theme] h1,
+body[data-theme] .stats strong {
+  color: var(--control-text);
+}
+
+body[data-theme] .teacher-panel {
+  background: color-mix(in srgb, var(--surface-strong) 84%, var(--peer));
+}
+
+body[data-theme] .cell {
+  background: var(--cell-bg);
+  color: var(--cell-text);
+  border-color: color-mix(in srgb, var(--cell-text) 18%, transparent);
+}
+
+body[data-theme] .cell.given {
+  background: var(--given-bg);
+  color: var(--cell-text);
+}
+
+body[data-theme] .cell.peer {
+  background: color-mix(in srgb, var(--peer) 72%, var(--cell-bg));
+}
+
+body[data-theme] .cell.same {
+  background: color-mix(in srgb, var(--same) 72%, var(--cell-bg));
+}
+
+body[data-theme] .cell.selected {
+  background: var(--selected);
+  color: var(--cell-text);
+}
+
+body[data-theme] .notes {
+  color: color-mix(in srgb, var(--cell-text) 64%, var(--ocean));
+}
+
+body[data-theme] .col-axis span,
+body[data-theme] .row-axis span {
+  background: var(--axis-bg);
+  color: var(--control-text);
+}
+
+body[data-theme] .card {
+  border-color: color-mix(in srgb, var(--control-text) 14%, rgba(255,255,255,.42));
+}
 
 body[data-theme="dusk"] .hero,
 body[data-theme="dusk"] .board-panel,

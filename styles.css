@@ -1922,3 +1922,28 @@ body:not(.tutor-active) .teacher-floating-rescue {
     bottom: auto !important;
   }
 }
+
+
+/* 電腦版教學說明加高：推理文字區域約增加一倍，手機版維持精簡高度。 */
+@media (min-width: 861px) {
+  body.tutor-active .teacher-panel.free-teacher-window,
+  body.tutor-active .teacher-panel.teacher-panel-safe-visible {
+    min-height: min(620px, calc(100vh - 24px)) !important;
+    max-height: calc(100vh - 24px) !important;
+  }
+
+  body.tutor-active .teacher-step {
+    min-height: 19rem !important;
+    max-height: min(58vh, 36rem) !important;
+  }
+
+  body.tutor-active.teacher-safe-dock .teacher-panel.teacher-panel-safe-visible,
+  body.tutor-active.teacher-safe-dock > .teacher-panel.teacher-panel-safe-visible {
+    max-height: min(72vh, 720px) !important;
+  }
+
+  body.tutor-active.teacher-safe-dock .teacher-step {
+    min-height: 18rem !important;
+    max-height: min(56vh, 34rem) !important;
+  }
+}

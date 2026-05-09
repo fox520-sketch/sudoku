@@ -1,4 +1,4 @@
-# 海洋風數獨 Ocean Sudoku
+# 數字獵局
 
 這是一個海洋風、手機可用的數獨網頁遊戲專案，使用 HTML、CSS、JavaScript 製作。
 

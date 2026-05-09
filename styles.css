@@ -1,4 +1,5 @@
 :root {
+  --teacher-shell-offset: max(14px, calc((100vw - 1120px) / 2));
   --bg-1: #e8fbff;
   --bg-2: #c8eef6;
   --bg-3: #a8dfeb;
@@ -1369,6 +1370,33 @@ body.teacher-mode:not(.tutor-active) .teacher-panel {
   display: grid;
 }
 
+@media (min-width: 861px) {
+  body.teacher-mode .game-layout {
+    grid-template-columns: minmax(300px, 760px);
+    justify-content: start;
+  }
+
+  body.teacher-mode .board-panel {
+    width: min(100%, 760px);
+    margin: 0;
+    justify-self: start;
+    padding: clamp(18px, 3vw, 30px);
+  }
+
+  body.teacher-mode .board-shell {
+    margin: 0;
+  }
+
+  body.teacher-mode .teacher-panel {
+    box-sizing: border-box;
+  }
+
+  body.teacher-mode:not(.tutor-active) > .teacher-panel {
+    width: min(760px, calc(100vw - (var(--teacher-shell-offset) * 2)));
+    margin: 12px 0 28px var(--teacher-shell-offset);
+  }
+}
+
 @media (max-width: 860px) {
   body.teacher-mode .game-layout {
     grid-template-columns: 1fr;
@@ -1614,7 +1642,7 @@ body[data-theme="dusk"] .teacher-drag-handle {
 /* 教學面板現在放在 body 最外層：未開始教學時仍保持像卡片一樣出現在盤面下方。 */
 body.teacher-mode:not(.tutor-active) > .teacher-panel {
   width: min(760px, calc(100% - 28px));
-  margin: -8px auto 28px;
+  margin: 12px auto 28px;
 }
 
 /* 固定底部安全模式：當使用者不想拖曳，或面板曾經消失時，可以改用穩定停靠。 */
